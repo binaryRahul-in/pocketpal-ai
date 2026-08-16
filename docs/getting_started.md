@@ -4,15 +4,15 @@ Note: Part of this guide is outdated. It will be updated soon.
 
 ## Installation
 
-**iPhone** users can grab it here: [PocketPal AI on the App Store](https://apps.apple.com/us/app/pocketpal-ai/id6502579498)
+**iPhone** users can grab it here: [MobiGPT on the App Store](https://apps.apple.com/us/app/pocketpal-ai/id6502579498)
 
-**Android** users can get it from here: [PocketPal AI on Google Play](https://play.google.com/store/apps/details?id=com.pocketpalai)
+**Android** users can get it from here: [MobiGPT on Google Play](https://play.google.com/store/apps/details?id=com.pocketpalai)
 
 Note: This is a personal project, so I am working on it in my spare time. It might have bugs and issues, and obviously, I have not tested it on all devices. If you encounter any issues, open an issue, or even better, contribute to the project!
 
 
 ### Available Models
-PocketPal AI comes pre-configured with some popular SLMs:
+MobiGPT comes pre-configured with some popular SLMs:
 
 - Danube 2 and 3
 - Phi
@@ -25,7 +25,7 @@ Modells need to be downloaded before use. You can download and use these models 
     <img src="../assets/models_page.webp" alt="Models Page" style="width: 33%;">
 </div>
 
-## Using PocketPal AI
+## Using MobiGPT
 
 ### Downloading a Model
 
@@ -51,7 +51,7 @@ On iOS devices, Apple’s GPU API (Metal) is activated by default. If you experi
 
 #### Auto Offload/Load
 
-To keep the device running smoothly, PocketPal AI can automatically manage memory usage:
+To keep the device running smoothly, MobiGPT can automatically manage memory usage:
 
 - Enable “Auto Offload/Load” on the model page (by default it is)
 - The app will offload the model when in the background
@@ -93,7 +93,7 @@ In the meantime, here are the current options for copying text:
 
 I know these options might not be ideal, and this is one of my frustrations with using other apps. The difficulty of copying portions of text used to be a particularly annoying aspect of chat apps like ChatGPT and others.
 
-**Developers**: PocketPal AI is built using React Native. Finding an easy solution that balances text selection with preserved formatting (especially Markdown support) has been tricky for me. If you have experience in this area, I’d love to hear from you!
+**Developers**: MobiGPT is built using React Native. Finding an easy solution that balances text selection with preserved formatting (especially Markdown support) has been tricky for me. If you have experience in this area, I’d love to hear from you!
 
 ## Feedback Welcome!
 

@@ -65,7 +65,7 @@ react {
 /**
  * Set this to true to Run Proguard on Release builds to minify the Java bytecode.
  */
-def enableProguardInReleaseBuilds = false
+def enableProguardInReleaseBuilds = true
 
 /**
  * The preferred build flavor of JavaScriptCore (JSC)
@@ -80,6 +80,10 @@ def enableProguardInReleaseBuilds = false
  */
 def jscFlavor = 'io.github.react-native-community:jsc-android:2026004.+'
 
+// Optional CI/release ABI selector. When omitted, development builds keep both
+// supported ABIs; release CI passes -PtargetAbi=arm64-v8a or x86_64.
+def targetAbi = project.findProperty("targetAbi")?.toString()
+
 android {
     ndkVersion rootProject.ext.ndkVersion
     buildToolsVersion rootProject.ext.buildToolsVersion
@@ -93,7 +97,11 @@ android {
         versionCode 143
         versionName "1.16.1"
         ndk {
-            abiFilters "arm64-v8a", "x86_64"
+            if (targetAbi) {
+                abiFilters targetAbi
+            } else {
+                abiFilters "arm64-v8a", "x86_64"
+            }
         }
     }
     externalNativeBuild {
@@ -145,7 +153,8 @@ android {
                 println "Warning: Release signing credentials not found, using debug keystore"
             }
             minifyEnabled enableProguardInReleaseBuilds
-            proguardFiles getDefaultProguardFile("proguard-android.txt"), "proguard-rules.pro"
+            shrinkResources enableProguardInReleaseBuilds
+            proguardFiles getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro"
             buildConfigField "boolean", "USE_DEV_SUPPORT", "false"
         }
         releaseE2e {

@@ -1,106 +1,121 @@
-# PocketPal Lite
+# MobiGPT
 
-PocketPal Lite is a reduced Android fork of [PocketPal AI](https://github.com/a-ghorbani/pocketpal-ai). It keeps the local GGUF/llama.cpp chat experience and the existing PocketPal-style conversation UI, while removing the active Pals/personas, video/image chat, voice setup, and other optional product surfaces from the main navigation.
+MobiGPT is a reduced Android-first fork of [PocketPal AI](https://github.com/a-ghorbani/pocketpal-ai). It keeps local GGUF/llama.cpp chat, model management, model recommendations, hardware information, conversation history, and offline operation after models are downloaded. Optional product surfaces removed from the Lite scope include active Pals/personas, video/image chat, voice setup, and other remote product surfaces.
+
+## Compatibility identity
+
+MobiGPT is a **user-visible rebrand only**. The Android application ID remains `com.pocketpallite`, the native namespace remains `com.pocketpal`, and the React Native registration key remains `PocketPal`. These identifiers must not be changed casually because doing so would create a new Android application and can break upgrades or startup registration. The visible launcher label and display name are `MobiGPT`.
 
 ## What the app does
 
-The app provides local text chat with downloaded models, a model catalog and settings screen, a hardware information screen, deterministic model recommendations, the existing benchmark/device-information screen, local chat-session history, and offline operation after a model has been downloaded. The Hardware screen uses the existing PocketPal model manager for downloads, progress, cancellation, integrity checks, deletion, and model settings.
+The app provides local text chat with downloaded models, a model catalog and settings screen, a hardware information screen, deterministic model recommendations, local chat-session history, and offline inference after a model has been downloaded. Model files are not bundled into the APK. They are downloaded and managed by the existing model manager, with progress, cancellation, integrity checks, deletion, and model settings.
 
-Recommendations are estimates. They reserve conservative memory and storage headroom, but they cannot guarantee that a model will be fast or usable on every phone. A model marked **Not recommended** can still be opened manually from Models if the user understands the risk.
+Recommendations are estimates. They reserve conservative memory and storage headroom but cannot guarantee that a model will be fast or usable on every phone. A model marked **Not recommended** can still be opened manually if the user accepts the risk.
 
 ## Repository layout
 
-| Path                                        | Purpose                                                                |
-| ------------------------------------------- | ---------------------------------------------------------------------- |
-| `App.tsx`                                   | Reduced root providers and drawer navigation.                          |
-| `src/screens/HardwareScreen/`               | Device facts, recommendation cards, and download actions.              |
-| `src/services/modelRecommendations.ts`      | Deterministic recommendation and formatting logic.                     |
-| `src/services/modelRecommendations.test.ts` | Focused unit tests for recommendation behavior.                        |
-| `src/components/ChatView/ChatView.tsx`      | Retained PocketPal chat UI with Pal-specific active rendering removed. |
-| `src/components/ChatPalModelPickerSheet/`   | Simplified model-only picker sheet.                                    |
-| `CHANGELOG-LITE.md`                         | Exact active-surface changes, removed features, and validation notes.  |
+| Path | Role |
+|---|---|
+| `App.tsx` | Reduced React Native root providers, navigation container, drawer, and retained product surfaces. |
+| `index.js` | React Native entrypoint. It registers the internal component name `PocketPal`; this is intentionally not renamed to MobiGPT. |
+| `src/screens/` | Chat, models, hardware, settings, benchmark, onboarding, and about screens. |
+| `src/components/` | Chat UI, model picker, settings sheets, sidebar, overlays, and reusable presentation components. |
+| `src/hooks/` | Deep-linking, model loading, memory checks, theme, storage, and other lifecycle logic. |
+| `src/services/` | Model recommendations, downloads, local inference integration, catalog access, persistence helpers, and feature services. |
+| `src/stores/` and `src/repositories/` | MobX/state and database/repository boundaries for models, chats, sessions, and settings. |
+| `android/` | Native Android wrapper, Gradle build, CMake/JNI hardware module, resources, workers, and release configuration. |
+| `.github/workflows/` | Manual debug build, optimized release matrix, focused validation, and upstream CI workflows. |
+| `report.md` | Developer-facing repository architecture, file map, and modification ledger. |
+| `fut_support.md` | Research and roadmap for APIs, models, agents, multimodality, image generation, TTS, and voice cloning. |
 
 ## Requirements
 
-Use a current Node.js version that satisfies the upstream package declaration, currently `>=22.21.0`. Install Android Studio with an Android SDK matching the project’s compile/target SDK, an Android NDK matching `27.3.13750724`, Android build tools matching `36.0.0`, and a supported JDK. Set `ANDROID_HOME` or `ANDROID_SDK_ROOT`, ensure `adb` is on `PATH`, and enable USB debugging on a physical phone for installation.
-
-The project uses Yarn and the existing React Native Android build. Do not use Expo Go: the app depends on native llama.cpp and Android modules.
+Use Node.js `>=22.21.0`, Yarn, JDK 17, Android SDK Platform 36, Build Tools 36.0.0, NDK `27.3.13750724`, CMake 3.22.1, and the Android Gradle wrapper checked into the repository. The project depends on native llama.cpp and Android modules; Expo Go is not supported.
 
 ## Install dependencies
 
 ```bash
-git clone <your-fork-url> pocketpal-lite
-cd pocketpal-lite
+git clone <your-fork-url> mobigpt
+cd mobigpt
 corepack enable
 yarn install
 ```
 
-If the local Node version is below the declared engine, upgrade Node rather than relying on `--ignore-engines`. The sandbox used `yarn install --ignore-engines --ignore-scripts` only because it had Node `22.13.0`; it is not the preferred development setup.
+## Local build commands
 
-## Build the Android APK
-
-For the reduced production-debug APK, run:
+The normal development build remains the universal, unshrunk debug variant:
 
 ```bash
 yarn build:android
 ```
 
-The expected output is under:
-
-```text
-android/app/build/outputs/apk/prodDebug/
-```
-
-For a release-style build:
+For an optimized release build for one ABI:
 
 ```bash
-yarn build:android:release
+cd android
+./gradlew assembleProdRelease -PtargetAbi=arm64-v8a
+./gradlew assembleProdRelease -PtargetAbi=x86_64
 ```
 
-A signed store artifact requires your own keystore and release credentials. Never commit a keystore, passwords, Hugging Face tokens, or model files to the repository.
+The `targetAbi` property is optional. When omitted, the Gradle configuration retains both supported ABIs for development/universal builds. Release builds enable R8 code shrinking and resource shrinking. Test every optimized release build before distribution because React Native, Hermes, JNI, reflection, and native model runtimes may need targeted keep rules.
+
+A release-style AAB can be built with:
+
+```bash
+cd android
+./gradlew bundleProdRelease
+```
+
+A signed store artifact requires an approved keystore and release credentials. Never commit a keystore, passwords, API keys, model files, or Hugging Face tokens.
+
+## GitHub Actions
+
+| Workflow | Trigger | Output |
+|---|---|---|
+| `MobiGPT Debug APK` | Manual `workflow_dispatch` only | `MobiGPT-debug-universal.apk`, an unshrunk development APK. |
+| `MobiGPT Release APKs` | `mobigpt-v*` tag or manual dispatch | Optimized `MobiGPT-release-arm64-v8a.apk`, `MobiGPT-release-x86_64.apk`, release AAB, checksums, R8 mapping outputs, and bundletool inspection artifacts. |
+| `MobiGPT Checks` | Focused validation workflow | TypeScript, ESLint, localization/font checks, and Lite-focused tests. |
+
+Debug builds are intentionally manual so ordinary pushes do not produce large artifacts. Release builds use a matrix with one ABI per APK. The workflow also creates device-specific APK sets from the AAB with bundletool to approximate Play-style delivery and reports their sizes.
+
+Without protected production signing secrets, CI release artifacts are test-signed and are not Google Play production artifacts. The release workflow must not be used to imply official store signing.
 
 ## Install on a phone
 
-With a connected Android device visible in `adb devices`, install the APK using:
+For an ABI-matching release APK or the universal debug APK:
 
 ```bash
-adb install -r android/app/build/outputs/apk/prodDebug/app-prod-debug.apk
+adb install -r MobiGPT-release-arm64-v8a.apk
 ```
 
-If Android blocks the installation, enable installation from the relevant file manager or authorize the computer on the phone. The Lite package is `com.pocketpallite`, so it can coexist with the upstream `com.pocketpalai` application.
+The application ID is still `com.pocketpallite`, so Android treats it as the same application identity as the prior Lite build. The visible application label is MobiGPT.
 
-## Use the app
+## Troubleshooting React Native startup
 
-Open **Hardware** to review the device profile and model recommendations. Use **Download in app** on a recommended entry or open **Models** to search and inspect the catalog. Downloads are stored in the app-controlled model directory and are not bundled in the APK. After the download is complete, select the model from the model picker in Chat and begin local generation.
+If Android reports that `PocketPal` has not been registered, verify that `app.json` still contains:
 
-The only network operations in the reduced product are catalog/model metadata requests and user-requested model downloads. After a model is present, chat-session history and inference are designed to work without network access. Model files may have separate licenses; review the provider and license link shown in the model details before use or redistribution.
+```json
+{"name":"PocketPal","displayName":"MobiGPT"}
+```
 
-## GitHub Actions APK build
+The `name` field is the internal React Native registration key and must match `MainActivity.getMainComponentName()`. `displayName` and the Android `app_name` resource are the user-visible branding fields.
 
-The repository includes `.github/workflows/pocketpal-lite-android.yml`. It builds the `prodDebug` Android variant on pushes to `main`, relevant pull requests, and manual `workflow_dispatch` runs. The workflow installs Node.js `22.21.0`, JDK 17, Android SDK Platform 36, Build Tools `36.0.0`, NDK `27.3.13750724`, and CMake `3.22.1`. It runs `yarn install --frozen-lockfile`, applies the checked-in Gradle compatibility patch through the postinstall script, creates CI-only placeholder configuration files, and uploads `app-prod-debug.apk` as the artifact `pocketpal-lite-prodDebug-apk`.
+If Metro is used for a debug build, stop any stale Metro process, run it from the repository root, clear its cache, and rebuild/reload. Release APKs bundle JavaScript and should not depend on a separately running Metro server.
 
-To use it, push this repository to GitHub, open the **Actions** tab, select **PocketPal Lite Android APK**, and choose **Run workflow** if you want to start it manually. After the job succeeds, open the workflow run and download the `pocketpal-lite-prodDebug-apk` artifact. The workflow checks out the complete Git history with `fetch-depth: 0`, but the APK build itself does not require repository secrets because it uses CI-only placeholder configuration and the debug signing key.
-
-## Verification commands
+## Focused verification commands
 
 ```bash
-yarn --ignore-engines typecheck
-yarn --ignore-engines lint
-yarn --ignore-engines jest src/services/modelRecommendations.test.ts --runInBand --coverage=false
+yarn typecheck
+yarn lint
+yarn jest src/services/modelRecommendations.test.ts --runInBand --coverage=false
 ```
 
-The full upstream Jest command enforces global coverage thresholds and is not equivalent to the focused recommendation test command. Run the full suite in a correctly provisioned development environment before publishing a release.
+The full upstream Jest suite contains tests for features intentionally removed from the Lite scope. Use the focused workflow as the baseline for this fork and document any upstream tests that assert removed behavior.
 
-## Sandbox build note
+## Branding asset
 
-The isolated build environment successfully installed dependencies, passed TypeScript validation, passed the focused recommendation tests, and reached Android Gradle configuration. The project includes `patches/@react-native+gradle-plugin+0.82.1.patch`, which updates the React Native Gradle plugin’s foojay resolver from `0.5.0` to `1.0.0` for Gradle 9 compatibility. The remaining sandbox blocker is that no Android SDK is installed:
-
-```text
-SDK location not found. Define a valid SDK location with an ANDROID_HOME environment variable
-```
-
-This is an environment limitation, not an application-code failure. On a development machine, install the Android SDK/NDK requirements, set `ANDROID_HOME` or `ANDROID_SDK_ROOT`, and retry after `cd android && ./gradlew --stop && ./gradlew clean`. The postinstall script applies the patch automatically after `yarn install`.
+The MobiGPT launcher icon is derived from the user-supplied GitHub avatar at `https://avatars.githubusercontent.com/u/166840758?v=4`. The source and compatibility note are recorded in `assets/branding-source.md`. Confirm permission to distribute the portrait as an application icon before public release.
 
 ## Attribution
 
-This project is derived from [a-ghorbani/pocketpal-ai](https://github.com/a-ghorbani/pocketpal-ai), baseline commit `505ac4b717b015c7f909120f99ee6fdb082b6793`. Retained open-source components and their licenses are documented in the upstream repository and in the project’s existing license files.
+This project is derived from [a-ghorbani/pocketpal-ai](https://github.com/a-ghorbani/pocketpal-ai), with Lite changes and MobiGPT user-visible branding. Retained open-source components and licenses remain documented in the upstream repository and existing license files.
