@@ -1,0 +1,129 @@
+name: PocketPal Lite Android APK
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    paths:
+      - 'App.tsx'
+      - 'app.json'
+      - 'android/**'
+      - 'src/**'
+      - 'package.json'
+      - 'yarn.lock'
+      - 'patches/**'
+      - '.github/workflows/pocketpal-lite-android.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pocketpal-lite-android-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-android-apk:
+    name: Build PocketPal Lite prodDebug APK
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Check out source with Git history
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22.21.0'
+          cache: yarn
+
+      - name: Enable Corepack and Yarn
+        shell: bash
+        run: |
+          corepack enable
+          yarn --version
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: gradle
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android SDK packages
+        shell: bash
+        run: |
+          sdkmanager "platform-tools" "platforms;android-36" "build-tools;36.0.0" "ndk;27.3.13750724" "cmake;3.22.1"
+          yes | sdkmanager --licenses >/dev/null || true
+
+      - name: Install JavaScript dependencies
+        run: yarn install --frozen-lockfile
+
+      - name: Create CI-only environment configuration
+        shell: bash
+        run: |
+          cat > .env <<'EOF'
+          FIREBASE_FUNCTIONS_URL=https://example.invalid/firebase-functions
+          SUPABASE_URL=https://example.invalid/supabase
+          SUPABASE_ANON_KEY=ci-placeholder
+          PALSHUB_API_BASE_URL=https://example.invalid/palshub
+          APP_URL=pocketpal://app
+          ENABLE_PALSHUB_INTEGRATION=false
+          ENABLE_AUTHENTICATION=false
+          ENABLE_OFFLINE_MODE=true
+          GOOGLE_IOS_CLIENT_ID=ci-placeholder
+          GOOGLE_WEB_CLIENT_ID=ci-placeholder
+          EOF
+
+      - name: Create CI-only Google services configuration
+        shell: bash
+        run: |
+          cat > android/app/google-services.json <<'EOF'
+          {
+            "project_info": {
+              "project_number": "000000000000",
+              "project_id": "pocketpal-lite-ci",
+              "storage_bucket": "pocketpal-lite-ci.appspot.com"
+            },
+            "client": [
+              {
+                "client_info": {
+                  "mobilesdk_app_id": "1:000000000000:android:0000000000000000",
+                  "android_client_info": {
+                    "package_name": "com.pocketpallite"
+                  }
+                },
+                "api_key": [
+                  {
+                    "current_key": "ci-placeholder"
+                  }
+                ]
+              }
+            ]
+          }
+          EOF
+
+      - name: Build prodDebug APK
+        working-directory: android
+        run: ./gradlew assembleProdDebug --no-daemon --stacktrace
+
+      - name: Verify APK exists
+        shell: bash
+        run: |
+          test -s android/app/build/outputs/apk/prod/debug/app-prod-debug.apk
+          sha256sum android/app/build/outputs/apk/prod/debug/app-prod-debug.apk
+
+      - name: Upload PocketPal Lite APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: pocketpal-lite-prodDebug-apk
+          path: android/app/build/outputs/apk/prod/debug/app-prod-debug.apk
+          if-no-files-found: error
+          retention-days: 14
