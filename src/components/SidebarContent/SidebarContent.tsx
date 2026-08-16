@@ -15,7 +15,6 @@ import {
   ChatIcon,
   EditIcon,
   ModelIcon,
-  PalIcon,
   SettingsIcon,
   ShareIcon,
   StarIcon,
@@ -545,18 +544,18 @@ export const SidebarContent: React.FC<DrawerContentComponentProps> = observer(
               testID="drawer-item-chat"
             />
             <Drawer.Item
-              label={l10n.components.sidebarContent.menuItems.pals}
-              icon={() => <PalIcon stroke={theme.colors.primary} />}
-              onPress={() => props.navigation.navigate(ROUTES.PALS)}
-              style={styles.menuDrawerItem}
-              testID="drawer-item-pals"
-            />
-            <Drawer.Item
               label={l10n.components.sidebarContent.menuItems.models}
               icon={() => <ModelIcon stroke={theme.colors.primary} />}
               onPress={() => props.navigation.navigate(ROUTES.MODELS)}
               style={styles.menuDrawerItem}
               testID="drawer-item-models"
+            />
+            <Drawer.Item
+              label="Hardware"
+              icon={() => <BenchmarkIcon stroke={theme.colors.primary} />}
+              onPress={() => props.navigation.navigate(ROUTES.HARDWARE)}
+              style={styles.menuDrawerItem}
+              testID="drawer-item-hardware"
             />
             <Drawer.Item
               label={l10n.components.sidebarContent.menuItems.benchmark}

@@ -33,12 +33,7 @@ import Reanimated, {
 
 import {useComponentSize} from '../KeyboardAccessoryView/hooks';
 
-import {
-  useTheme,
-  useMessageActions,
-  usePrevious,
-  usePalLoadHint,
-} from '../../hooks';
+import {useTheme, useMessageActions, usePrevious} from '../../hooks';
 
 import ImageView from './ImageView';
 import {BannerRow} from './BannerRow';
@@ -56,14 +51,12 @@ import {CONTEXT_LADDER} from '../../utils/bannerVariantResolver';
 import {chatSessionStore, modelStore} from '../../store';
 
 import {MessageType, User} from '../../utils/types';
-import {Pal} from '../../types/pal';
 import {
   calculateChatMessages,
   unwrap,
   UserContext,
   L10nContext,
 } from '../../utils';
-import {hasVideoCapability} from '../../utils/pal-capabilities';
 
 import {
   Message,
@@ -77,10 +70,7 @@ import {
   ChatPalModelPickerSheet,
   ChatHeader,
   ChatEmptyPlaceholder,
-  VideoPalEmptyPlaceholder,
   ContentReportSheet,
-  GreetingBubble,
-  SuggestedPromptsRow,
 } from '..';
 import {
   AlertIcon,
@@ -154,10 +144,9 @@ export interface ChatProps extends ChatTopLevelProps {
    * to the very end of the list (minus `onEndReachedThreshold`).
    * See {@link ChatProps.flatListProps} to set it up. */
   onEndReached?: () => Promise<void>;
-  /** The currently active pal */
-  activePal?: Pal;
-  /** Called when pal sheet should be opened */
-  onPalSettingsSelect?: (pal: Pal) => void;
+  /** Legacy Pal props are accepted for dormant upstream tests/components but ignored in the reduced app. */
+  activePal?: unknown;
+  onPalSettingsSelect?: (...args: any[]) => void;
   /** Show user names for received messages. Useful for a group chat. Will be
    * shown only on text messages. */
   showUserNames?: boolean;
@@ -215,8 +204,6 @@ export const ChatView = observer(
     onEndReached,
     onMessageLongPress: externalOnMessageLongPress,
     onMessagePress,
-    activePal,
-    onPalSettingsSelect,
     onPreviewDataFetched,
     onSendPress,
     onStopPress,
@@ -259,7 +246,6 @@ export const ChatView = observer(
     const [_selectedModel, setSelectedModel] = React.useState<string | null>(
       null,
     );
-    const [_selectedPal, setSelectedPal] = React.useState<string | undefined>();
 
     // Image viewer state
     const [isImageViewVisible, setIsImageViewVisible] = React.useState(false);
@@ -344,9 +330,6 @@ export const ChatView = observer(
       return () => clearTimeout(timer);
     }, [reloadSnackbar]);
 
-    // One-shot pal-load hint snackbar (separate surface from the banner).
-    const palLoadHint = usePalLoadHint({activePal, isFocused});
-
     // ============ COMPONENT SIZE TRACKING ============
     const {onLayout, size} = useComponentSize();
     const {onLayout: onLayoutChatInput, size: chatInputHeight} =
@@ -385,29 +368,6 @@ export const ChatView = observer(
       // eslint-disable-next-line react-hooks/exhaustive-deps -- MobX observer makes activeSessionId reactive
     }, [chatSessionStore.activeSessionId]);
 
-    // ============ ACTIVE PAL MODEL INITIALIZATION ============
-    // Initialize model context when active pal changes.
-    // Gate: while the e2e benchmark runner owns the native context lifecycle,
-    // this auto-load must NOT fire — otherwise it shadows the matrix's per-cell
-    // devices/n_gpu_layers via initContext's "already loaded → skip" path.
-    React.useEffect(() => {
-      if (modelStore.benchmarkActive) {
-        return;
-      }
-      if (activePal) {
-        if (!modelStore.activeModel && activePal.defaultModel) {
-          const palDefaultModel = modelStore.availableModels.find(
-            m => m.id === activePal.defaultModel?.id,
-          );
-
-          if (palDefaultModel) {
-            // Initialize the model context
-            modelStore.selectModel(palDefaultModel);
-          }
-        }
-      }
-    }, [activePal]);
-
     // ============ KEYBOARD ANIMATION SETUP ============
     // Get real-time keyboard height from the keyboard controller
     const keyboard = useReanimatedKeyboardAnimation();
@@ -433,14 +393,6 @@ export const ChatView = observer(
     const inputContainerAnimatedStyle = useAnimatedStyle(() => ({
       transform: [{translateY: -keyboardOcclusion.value}],
       paddingBottom: isKeyboardVisible.value ? 0 : insets.bottom,
-    }));
-
-    // Suggested-prompts overlay shares the input's keyboard translation but
-    // must NOT inherit paddingBottom (which the input uses to clear the
-    // home indicator). Applying it here would create a large empty gap
-    // between the chips and the input when the keyboard is closed.
-    const suggestedPromptsAnimatedStyle = useAnimatedStyle(() => ({
-      transform: [{translateY: -keyboardOcclusion.value}],
     }));
 
     // ============ SCROLL TRACKING & SCROLL-TO-BOTTOM ============
@@ -908,29 +860,16 @@ export const ChatView = observer(
       ],
     );
 
-    // Render empty state (video pal or regular chat placeholder)
-    const renderListEmptyComponent = React.useCallback(() => {
-      // Show VideoPalEmptyPlaceholder for video pal, otherwise show regular ChatEmptyPlaceholder
-      if (activePal && hasVideoCapability(activePal)) {
-        return (
-          <VideoPalEmptyPlaceholder
-            bottomComponentHeight={bottomComponentHeight}
-          />
-        );
-      }
-
-      return (
-        <>
-          {activePal?.greeting?.text && modelStore.activeModelId ? (
-            <GreetingBubble text={activePal.greeting.text} />
-          ) : null}
-          <ChatEmptyPlaceholder
-            bottomComponentHeight={bottomComponentHeight}
-            onSelectModel={() => setIsPickerVisible(true)}
-          />
-        </>
-      );
-    }, [bottomComponentHeight, setIsPickerVisible, activePal]);
+    // Render the standard empty state for local text chat.
+    const renderListEmptyComponent = React.useCallback(
+      () => (
+        <ChatEmptyPlaceholder
+          bottomComponentHeight={bottomComponentHeight}
+          onSelectModel={() => setIsPickerVisible(true)}
+        />
+      ),
+      [bottomComponentHeight],
+    );
 
     // Render footer (loading indicator or spacer)
     const renderListFooterComponent = React.useCallback(
@@ -1084,15 +1023,8 @@ export const ChatView = observer(
       setIsPickerVisible(false);
     }, []);
 
-    const handlePalSelect = React.useCallback((pal: string | undefined) => {
-      setSelectedPal(pal);
-      setIsPickerVisible(false);
-    }, []);
-
     // ============ COMPUTED VALUES ============
-    const inputBackgroundColor = activePal?.color?.[1]
-      ? activePal.color?.[1]
-      : theme.colors.surface;
+    const inputBackgroundColor = theme.colors.surface;
 
     // Soft cap: warn the user before the 5th HTML preview in this session.
     // Memory pressure on budget Android becomes a hazard above 5 WebViews;
@@ -1169,40 +1101,14 @@ export const ChatView = observer(
                   textInputProps: {
                     ...textInputProps,
                     // Only override value and onChangeText if not using promptText
-                    ...(!(activePal && hasVideoCapability(activePal)) && {
-                      value: inputText,
-                      onChangeText: setInputText,
-                    }),
+                    value: inputText,
+                    onChangeText: setInputText,
                   },
                 }}
               />
             </Reanimated.View>
 
-            {/* Suggested prompts — float above the input container, share
-                its keyboard-tracking transform so they rise together but
-                render as a sibling (no shared background / rounded top). */}
-            {messages.length === 0 &&
-            !isStreaming &&
-            modelStore.activeModelId !== undefined &&
-            activePal?.greeting?.suggestedPrompts &&
-            activePal.greeting.suggestedPrompts.length > 0 ? (
-              <Reanimated.View
-                pointerEvents="box-none"
-                style={[
-                  styles.suggestedPromptsOverlay,
-                  suggestedPromptsAnimatedStyle,
-                  {bottom: chatInputHeight.height},
-                ]}>
-                <SuggestedPromptsRow
-                  prompts={activePal.greeting.suggestedPrompts}
-                  onSelect={prompt =>
-                    wrappedOnSendPress({type: 'text', text: prompt})
-                  }
-                />
-              </Reanimated.View>
-            ) : null}
-
-            {/* Pal/Model picker sheet */}
+            {/* Model picker sheet */}
             {/* Conditionally render the sheet to avoid keyboard issues.
             It makes the disappearing sudden, but it's better than the keyboard issue.*/}
             {isPickerVisible && (
@@ -1210,8 +1116,6 @@ export const ChatView = observer(
                 isVisible={isPickerVisible}
                 onClose={() => setIsPickerVisible(false)}
                 onModelSelect={handleModelSelect}
-                onPalSelect={handlePalSelect}
-                onPalSettingsSelect={onPalSettingsSelect}
                 chatInputHeight={chatInputHeight.height}
               />
             )}
@@ -1252,9 +1156,6 @@ export const ChatView = observer(
                 setIncreaseSheetOpen(false);
               }}
               onReloadStart={() => {
-                // Single advisory surface: dismiss the pal-load hint in the
-                // same handler so no frame shows two snackbars at once.
-                palLoadHint.dismiss();
                 setReloadSnackbar({
                   message: l10n.chat.increaseContextReloading,
                   indefinite: true,
@@ -1281,21 +1182,6 @@ export const ChatView = observer(
             }
             testID="context-reload-snackbar">
             {reloadSnackbar?.message ?? ''}
-          </Snackbar>
-
-          <Snackbar
-            visible={isFocused && palLoadHint.hintVisible && !reloadSnackbar}
-            onDismiss={palLoadHint.dismiss}
-            duration={6000}
-            action={{
-              label: l10n.chat.contextMoreRoom,
-              onPress: () => {
-                palLoadHint.dismiss();
-                setIncreaseSheetOpen(true);
-              },
-            }}
-            testID="pal-load-hint-snackbar">
-            {l10n.chat.palLoadHint}
           </Snackbar>
         </View>
       </UserContext.Provider>

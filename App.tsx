@@ -14,7 +14,7 @@ import {
   GestureHandlerRootView,
 } from 'react-native-gesture-handler';
 
-import {ttsStore, uiStore} from './src/store';
+import {uiStore} from './src/store';
 import {useTheme} from './src/hooks';
 import {useDeepLinking} from './src/hooks/useDeepLinking';
 import {Theme} from './src/utils/types';
@@ -26,26 +26,23 @@ import {ROUTES} from './src/utils/navigationConstants';
 import {
   SidebarContent,
   ModelsHeaderRight,
-  PalHeaderRight,
   HeaderLeft,
   AppWithMigration,
-  TTSSetupSheet,
   DownloadOverlay,
-  HubRunSheetHost,
 } from './src/components';
 import {MarkdownProvider} from './src/components/MarkdownView';
-import {AutomationBridge, BenchmarkRunnerScreen} from './src/__automation__';
+import {BenchmarkRunnerScreen} from './src/__automation__';
 import {
   ChatScreen,
   ModelsScreen,
   SettingsScreen,
   BenchmarkScreen,
   AboutScreen,
+  HardwareScreen,
 
   // Dev tools screen. Only available in debug mode.
   DevToolsScreen,
 } from './src/screens';
-import PalsScreen from './src/screens/PalsScreen';
 import {OnboardingStack} from './src/screens/OnboardingScreens';
 
 // Check if app is in debug mode
@@ -90,17 +87,8 @@ const App = observer(() => {
     initLocale(uiStore.language);
   }, []);
 
-  // Initialize TTS store (memory gate + AppState/session listeners).
-  // Fire-and-forget: `init()` is idempotent and swallows its own errors.
-  React.useEffect(() => {
-    ttsStore.init().catch(() => {
-      // init() swallows its own errors; catch to satisfy no-floating-promises.
-    });
-  }, []);
-
   return (
     <GestureHandlerRootView style={styles.root}>
-      {__E2E__ ? <AutomationBridge /> : null}
       <SafeAreaProvider>
         <KeyboardProvider statusBarTranslucent navigationBarTranslucent>
           <PaperProvider theme={theme}>
@@ -135,21 +123,20 @@ const App = observer(() => {
                             }}
                           />
                           <Drawer.Screen
-                            name={ROUTES.PALS}
-                            component={gestureHandlerRootHOC(PalsScreen)}
-                            options={{
-                              headerRight: () => <PalHeaderRight />,
-                              headerStyle: styles.headerWithoutDivider,
-                              title: currentL10n.screenTitles.pals,
-                            }}
-                          />
-                          <Drawer.Screen
                             name={ROUTES.MODELS}
                             component={gestureHandlerRootHOC(ModelsScreen)}
                             options={{
                               headerRight: () => <ModelsHeaderRight />,
                               headerStyle: styles.headerWithoutDivider,
                               title: currentL10n.screenTitles.models,
+                            }}
+                          />
+                          <Drawer.Screen
+                            name={ROUTES.HARDWARE}
+                            component={gestureHandlerRootHOC(HardwareScreen)}
+                            options={{
+                              headerStyle: styles.headerWithoutDivider,
+                              title: 'Hardware',
                             }}
                           />
                           <Drawer.Screen
@@ -213,9 +200,7 @@ const App = observer(() => {
                         </Drawer.Navigator>
                       }
                     />
-                    <TTSSetupSheet />
                     <DownloadOverlay />
-                    <HubRunSheetHost />
                   </BottomSheetModalProvider>
                 </NavigationContainer>
               </MarkdownProvider>

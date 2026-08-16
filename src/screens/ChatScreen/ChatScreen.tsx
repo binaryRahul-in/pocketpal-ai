@@ -9,28 +9,17 @@ import {
   ErrorSnackbar,
   ModelErrorReportSheet,
 } from '../../components';
-import {PalSheet} from '../../components/PalsSheets';
 
 import {useChatSession} from '../../hooks';
 import {usePendingMessage} from '../../hooks/useDeepLinking';
-import {Pal} from '../../types/pal';
 
-import {
-  modelStore,
-  chatSessionStore,
-  palStore,
-  serverStore,
-  uiStore,
-} from '../../store';
-import {hasVideoCapability} from '../../utils/pal-capabilities';
+import {modelStore, chatSessionStore, serverStore, uiStore} from '../../store';
 
 import {L10nContext} from '../../utils';
 import {resolveReasoningCapability} from '../../utils/reasoningCapability';
 import {MessageType} from '../../utils/types';
 import {ErrorState} from '../../utils/errors';
 import {user, assistant} from '../../utils/chat';
-
-import {VideoPalScreen} from './VideoPalScreen';
 
 const renderBubble = ({
   child,
@@ -59,15 +48,6 @@ export const ChatScreen: React.FC = observer(() => {
   } | null>(null);
   const l10n = React.useContext(L10nContext);
 
-  const activePalId = chatSessionStore.activePalId;
-  const activePal = activePalId
-    ? palStore.pals.find(p => p.id === activePalId)
-    : undefined;
-  const isVideoPal = activePal && hasVideoCapability(activePal);
-
-  // State for pal sheet
-  const [isPalSheetVisible, setIsPalSheetVisible] = useState(false);
-
   // State for model error report sheet
   const [isErrorReportVisible, setIsErrorReportVisible] = useState(false);
   const [errorToReport, setErrorToReport] = useState<ErrorState | null>(null);
@@ -80,15 +60,6 @@ export const ChatScreen: React.FC = observer(() => {
 
   // Handle deep linking for message prefill
   const {pendingMessage, clearPendingMessage} = usePendingMessage();
-
-  // Callback handler for opening pal sheet
-  const handleOpenPalSheet = React.useCallback((_pal: Pal) => {
-    setIsPalSheetVisible(true);
-  }, []);
-
-  const handleClosePalSheet = React.useCallback(() => {
-    setIsPalSheetVisible(false);
-  }, []);
 
   // Handlers for model error report
   const handleReportModelError = React.useCallback(() => {
@@ -103,8 +74,6 @@ export const ChatScreen: React.FC = observer(() => {
     setIsErrorReportVisible(false);
     setErrorToReport(null);
   }, []);
-
-  const visionEnabled = modelStore.activeModelCaps.visionActive;
 
   // Resolver is the single source of truth for reasoning capability.
   // Pill is reachable whenever the model is not known to be non-reasoning
@@ -142,53 +111,7 @@ export const ChatScreen: React.FC = observer(() => {
     chatSessionStore.newChatCompletionSettings,
     chatSessionStore.newChatThinkingOverride,
     chatSessionStore.newChatReasoningEffort,
-    activePalId,
   ]);
-
-  // Tool-compatibility one-time banner: when the active Pal declares
-  // tools but the loaded model's jinja metadata signals no tool support
-  // in any of its slots (see below), surface an inline warning.
-  // Persisted per model id so the warning fires at most once.
-  React.useEffect(() => {
-    const palDeclaresTools =
-      activePal?.pact?.talents !== undefined &&
-      activePal.pact.talents.length > 0;
-    if (!palDeclaresTools) {
-      return;
-    }
-    const model = (modelStore.context as any)?.model;
-    const modelId = modelStore.activeModelId;
-    if (!model || !modelId) {
-      return;
-    }
-    // Tool support surfaces in four independent places in llama.rn's
-    // jinja metadata: defaultCaps.tools/toolCalls (model declares it
-    // inline in the default template — Ministral, Llama 3.x, etc.) or
-    // toolUse/toolUseCaps (separate tool-use template — Qwen3, etc.).
-    // Any one is sufficient; only warn when all four are absent.
-    const jinja = model.chatTemplates?.jinja;
-    const hasToolSupport =
-      !!jinja?.defaultCaps?.tools ||
-      !!jinja?.defaultCaps?.toolCalls ||
-      !!jinja?.toolUse ||
-      !!jinja?.toolUseCaps;
-    if (hasToolSupport) {
-      return;
-    }
-    if (uiStore.hasWarnedToolCompat(modelId)) {
-      return;
-    }
-    uiStore.setChatWarning({
-      code: 'unknown',
-      message: l10n.chat.toolCompatWarning,
-      context: 'chat',
-      recoverable: true,
-      severity: 'warning',
-      metadata: {modelId},
-    });
-    uiStore.markToolCompatWarned(modelId);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activePalId, modelStore.activeModelId, modelStore.context]);
 
   // Persist the on/off intent (and optional effort) onto both the local
   // enable_thinking flag and the reasoning carrier so the remote wire path
@@ -248,27 +171,20 @@ export const ChatScreen: React.FC = observer(() => {
     await persistReasoning(nextEnabled, nextEffort);
   };
 
-  // If the active pal is a video pal, show the video pal screen
-  if (isVideoPal) {
-    return <VideoPalScreen activePal={activePal} />;
-  }
-
-  // Otherwise, show the regular chat view
+  // The reduced app always uses the local text-chat surface.
   return (
     <>
       <ChatView
         renderBubble={renderBubble}
         messages={chatSessionStore.currentSessionMessages}
-        activePal={activePal}
         onSendPress={handleSendPress}
         onStopPress={handleStopPress}
-        onPalSettingsSelect={handleOpenPalSheet}
         user={user}
         isStopVisible={modelStore.inferencing}
         isStreaming={modelStore.isStreaming}
         sendButtonVisibilityMode="always"
-        showImageUpload={true}
-        isVisionEnabled={visionEnabled}
+        showImageUpload={false}
+        isVisionEnabled={false}
         initialInputText={pendingMessage || undefined}
         onInitialTextConsumed={clearPendingMessage}
         inputProps={{
@@ -306,13 +222,6 @@ export const ChatScreen: React.FC = observer(() => {
         onClose={handleCloseErrorReport}
         error={errorToReport}
       />
-      {activePal && (
-        <PalSheet
-          isVisible={isPalSheetVisible}
-          onClose={handleClosePalSheet}
-          pal={activePal}
-        />
-      )}
     </>
   );
 });
