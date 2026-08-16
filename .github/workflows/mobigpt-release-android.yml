@@ -144,7 +144,7 @@ jobs:
 
       - name: Build optimized release APK
         working-directory: android
-        run: ./gradlew assembleProdRelease -PtargetAbi=${{ matrix.abi }} --no-daemon --stacktrace
+        run: ./gradlew assembleProdRelease -PtargetAbi=${{ matrix.abi }} -PreactNativeArchitectures=${{ matrix.abi }} --no-daemon --stacktrace
 
       - name: Inspect release APK metadata and ABI
         shell: bash
