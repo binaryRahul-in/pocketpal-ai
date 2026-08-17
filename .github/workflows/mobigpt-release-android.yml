@@ -202,7 +202,7 @@ jobs:
           cores: 2
           ram-size: 2048M
           heap-size: 512M
-          boot-timeout: 900
+          emulator-boot-timeout: 900
           force-avd-creation: true
           emulator-options: -no-window -no-audio -no-boot-anim -no-snapshot -gpu swiftshader_indirect
           disable-animations: true
