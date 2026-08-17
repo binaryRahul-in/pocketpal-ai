@@ -205,7 +205,7 @@ jobs:
           emulator-boot-timeout: 900
           force-avd-creation: true
           emulator-options: -no-window -no-audio -no-boot-anim -no-snapshot -gpu swiftshader_indirect
-          disable-animations: true
+          disable-animations: false
           script: |
             set -euo pipefail
             adb install -r release/MobiGPT-release-x86_64.apk
