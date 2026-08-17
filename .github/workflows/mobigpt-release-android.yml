@@ -180,6 +180,45 @@ jobs:
           if-no-files-found: error
           retention-days: 30
 
+  smoke-test-release:
+    name: Smoke-test optimized release APK
+    needs: build-release-apks
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Download x86_64 release APK
+        uses: actions/download-artifact@v4
+        with:
+          name: MobiGPT-release-x86_64
+          path: release
+
+      - name: Install and launch optimized APK in emulator
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          target: google_apis
+          arch: x86_64
+          profile: pixel_2
+          cores: 2
+          ram-size: 4096M
+          heap-size: 512M
+          emulator-options: -no-window -no-audio -no-boot-anim -gpu swiftshader_indirect
+          disable-animations: true
+          script: |
+            set -euo pipefail
+            adb install -r release/MobiGPT-release-x86_64.apk
+            adb shell am force-stop com.pocketpallite
+            adb shell monkey -p com.pocketpallite 1
+            sleep 30
+            pid=$(adb shell pidof com.pocketpallite | tr -d '\r' || true)
+            if ! printf '%s' "$pid" | grep -Eq '[0-9]'; then
+              echo 'MobiGPT exited during startup; collecting logcat.' >&2
+              adb logcat -d -b main -b system -b crash -v time >&2 || true
+              exit 1
+            fi
+            echo "MobiGPT remained running with pid $pid"
+            adb shell am force-stop com.pocketpallite
+
   build-and-inspect-bundle:
     name: Build and inspect optimized release AAB
     needs: validate-js
@@ -293,7 +332,7 @@ jobs:
 
   publish-release:
     name: Publish MobiGPT prerelease assets
-    needs: [build-release-apks, build-and-inspect-bundle]
+    needs: [build-release-apks, smoke-test-release, build-and-inspect-bundle]
     permissions:
       contents: write
     if: github.event_name == 'push' || inputs.publish-release == true
