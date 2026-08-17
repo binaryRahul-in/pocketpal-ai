@@ -214,17 +214,11 @@ jobs:
           emulator-options: -no-window -no-audio -no-boot-anim -no-snapshot -gpu swiftshader_indirect
           disable-animations: false
           script: |
-            set -eu
             adb install -r release/MobiGPT-release-x86_64.apk
             adb shell am force-stop com.pocketpallite
             adb shell monkey -p com.pocketpallite 1
             sleep 30
-            pid=$(adb shell pidof com.pocketpallite | tr -d '\r' || true)
-            if ! printf '%s' "$pid" | grep -Eq '[0-9]'; then
-              echo 'MobiGPT exited during startup; collecting logcat.' >&2
-              adb logcat -d -b main -b system -b crash -v time >&2 || true
-              exit 1
-            fi
+            pid=$(adb shell pidof com.pocketpallite | tr -d '\r' || true); if ! printf '%s' "$pid" | grep -Eq '[0-9]'; then echo 'MobiGPT exited during startup; collecting logcat.' >&2; adb logcat -d -b main -b system -b crash -v time >&2 || true; exit 1; fi
             echo "MobiGPT remained running with pid $pid"
             adb shell am force-stop com.pocketpallite
 
