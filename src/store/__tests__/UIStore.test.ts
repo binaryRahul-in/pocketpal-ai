@@ -1,8 +1,10 @@
 import {UIStore, uiStore} from '../UIStore';
 import {l10n, supportedLanguages} from '../../locales';
 
-jest.mock('react-native/Libraries/Utilities/Appearance', () => ({
-  getColorScheme: jest.fn(() => 'light'),
+jest.mock('react-native', () => ({
+  Appearance: {
+    getColorScheme: jest.fn(() => 'light'),
+  },
 }));
 
 describe('UIStore', () => {

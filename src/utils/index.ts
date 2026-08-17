@@ -5,7 +5,6 @@ import _ from 'lodash';
 import dayjs from 'dayjs';
 import {MD3Theme} from 'react-native-paper';
 import DeviceInfo from 'react-native-device-info';
-import Blob from 'react-native/Libraries/Blob/Blob';
 import * as RNFS from '@dr.pogodin/react-native-fs';
 
 import {l10n} from '../locales';
@@ -36,8 +35,22 @@ export const L10nContext = React.createContext<
 >(l10n.en);
 export const UserContext = React.createContext<User | undefined>(undefined);
 
-/** Returns size in bytes of the provided text */
-export const getTextSizeInBytes = (text: string) => new Blob([text]).size;
+/** Returns the UTF-8 byte size of the provided text without relying on RN private APIs. */
+export const getTextSizeInBytes = (text: string) => {
+  let byteLength = 0;
+  for (const character of text) {
+    const codePoint = character.codePointAt(0) ?? 0;
+    byteLength +=
+      codePoint <= 0x7f
+        ? 1
+        : codePoint <= 0x7ff
+          ? 2
+          : codePoint <= 0xffff
+            ? 3
+            : 4;
+  }
+  return byteLength;
+};
 
 /** Returns theme colors as ColorValue array */
 export const getThemeColorsAsArray = (theme: MD3Theme): ColorValue[] => {

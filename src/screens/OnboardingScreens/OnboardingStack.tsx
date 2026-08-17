@@ -1,5 +1,5 @@
 import React, {useState} from 'react';
-import {View} from 'react-native';
+import {StyleSheet, View} from 'react-native';
 import {createStackNavigator} from '@react-navigation/stack';
 
 import {ROUTES} from '../../utils/navigationConstants';
@@ -17,6 +17,11 @@ import {
 } from './components/OnboardingTopChrome';
 
 const Stack = createStackNavigator();
+const styles = StyleSheet.create({
+  root: {
+    flex: 1,
+  },
+});
 
 /**
  * Onboarding navigator with persistent top chrome (Stepper + Skip/Audio).
@@ -27,7 +32,7 @@ const Stack = createStackNavigator();
 export const OnboardingStack: React.FC = () => {
   const [chromeStep, setChromeStep] = useState<OnboardingChromeStep>('splash');
   return (
-    <View style={{flex: 1}}>
+    <View style={styles.root}>
       <Stack.Navigator
         screenOptions={{headerShown: false, gestureEnabled: false}}
         initialRouteName={ROUTES.ONBOARDING.SPLASH}

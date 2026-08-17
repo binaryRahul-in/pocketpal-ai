@@ -1,5 +1,11 @@
 import React, {useContext, useEffect, useState} from 'react';
-import {TouchableOpacity, View, Alert, SectionList} from 'react-native';
+import {
+  TouchableOpacity,
+  View,
+  Alert,
+  SectionList,
+  type ColorValue,
+} from 'react-native';
 import {observer} from 'mobx-react';
 import {Divider, Drawer, Text} from 'react-native-paper';
 import {GestureHandlerRootView} from 'react-native-gesture-handler';
@@ -28,6 +34,32 @@ import {exportChatSession} from '../../utils/exportUtils';
 
 // Check if app is in debug mode
 const isDebugMode = __DEV__;
+
+type IconRendererProps = {color: ColorValue};
+
+const PinnedSessionStarIcon = ({color}: IconRendererProps) => (
+  <StarIcon width={14} height={14} fill={String(color)} />
+);
+
+const PinnedMenuStarIcon = ({color}: IconRendererProps) => (
+  <StarIcon width={20} height={20} fill={String(color)} />
+);
+
+const UnpinnedMenuStarIcon = ({color}: IconRendererProps) => (
+  <StarIcon width={20} height={20} stroke={String(color)} />
+);
+
+const RenameMenuIcon = ({color}: IconRendererProps) => (
+  <EditIcon stroke={String(color)} />
+);
+
+const ExportMenuIcon = ({color}: IconRendererProps) => (
+  <ShareIcon stroke={String(color)} />
+);
+
+const DeleteMenuIcon = ({color}: IconRendererProps) => (
+  <TrashIcon stroke={String(color)} />
+);
 
 // Session item props interface
 interface SessionItemProps {
@@ -108,17 +140,7 @@ const SessionItem = React.memo<SessionItemProps>(
             active={isActive}
             label={session.title}
             style={styles.sessionDrawerItem}
-            right={
-              isPinned
-                ? () => (
-                    <StarIcon
-                      width={14}
-                      height={14}
-                      fill={theme.colors.primary}
-                    />
-                  )
-                : undefined
-            }
+            right={isPinned ? PinnedSessionStarIcon : undefined}
           />
         </TouchableOpacity>
         {!isSelectionMode && (
@@ -127,7 +149,6 @@ const SessionItem = React.memo<SessionItemProps>(
             onDismiss={onMenuDismiss}
             anchor={menuPosition}
             style={styles.menu}
-            contentStyle={{}}
             anchorPosition="bottom">
             <Menu.Item
               testID={`session-pin-${session.id}`}
@@ -140,18 +161,8 @@ const SessionItem = React.memo<SessionItemProps>(
                   ? l10n.components.sidebarContent.unpin
                   : l10n.components.sidebarContent.pin
               }
-              leadingIcon={() => (
-                <StarIcon
-                  width={20}
-                  height={20}
-                  // star.svg is stroke-only and .svgrrc binds that stroke to the
-                  // fill prop, so fill='none' paints nothing. Omitting fill is
-                  // what yields an outline; no test can catch this (svg is mocked).
-                  {...(isPinned
-                    ? {fill: theme.colors.primary}
-                    : {stroke: theme.colors.primary})}
-                />
-              )}
+              theme={{colors: {onSurfaceVariant: theme.colors.primary}}}
+              leadingIcon={isPinned ? PinnedMenuStarIcon : UnpinnedMenuStarIcon}
             />
             <Divider style={styles.menuDivider} />
             <Menu.Item
@@ -160,7 +171,8 @@ const SessionItem = React.memo<SessionItemProps>(
                 onMenuDismiss();
               }}
               label={l10n.common.rename}
-              leadingIcon={() => <EditIcon stroke={theme.colors.primary} />}
+              theme={{colors: {onSurfaceVariant: theme.colors.primary}}}
+              leadingIcon={RenameMenuIcon}
             />
             <Menu.Item
               onPress={() => {
@@ -168,7 +180,8 @@ const SessionItem = React.memo<SessionItemProps>(
                 onMenuDismiss();
               }}
               label={l10n.common.export}
-              leadingIcon={() => <ShareIcon stroke={theme.colors.primary} />}
+              theme={{colors: {onSurfaceVariant: theme.colors.primary}}}
+              leadingIcon={ExportMenuIcon}
             />
             <Menu.Item
               onPress={() => {
@@ -176,8 +189,9 @@ const SessionItem = React.memo<SessionItemProps>(
                 onMenuDismiss();
               }}
               label={l10n.common.delete}
-              labelStyle={{color: theme.colors.error}}
-              leadingIcon={() => <TrashIcon stroke={theme.colors.error} />}
+              labelStyle={styles.deleteMenuLabel}
+              theme={{colors: {onSurfaceVariant: theme.colors.error}}}
+              leadingIcon={DeleteMenuIcon}
             />
             <Divider style={styles.menuDivider} />
             <Menu.Item
@@ -219,7 +233,7 @@ const SelectionModeHeader: React.FC<SelectionModeHeaderProps> = ({
   return (
     <View style={styles.selectionModeHeader}>
       <TouchableOpacity onPress={onCancel} testID="cancel-selection-button">
-        <Text style={{color: theme.colors.primary}}>{l10n.common.cancel}</Text>
+        <Text style={styles.cancelText}>{l10n.common.cancel}</Text>
       </TouchableOpacity>
 
       <Text style={styles.selectedCountText}>

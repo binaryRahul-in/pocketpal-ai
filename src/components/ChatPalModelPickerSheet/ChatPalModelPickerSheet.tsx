@@ -96,7 +96,7 @@ export const ChatPalModelPickerSheet = observer(
         enableContentPanningGesture={false}
         enableHandlePanningGesture
         accessible={false}>
-        <View style={{paddingHorizontal: 16, paddingBottom: 8}}>
+        <View style={styles.modelPickerHeader}>
           <PaperText variant="titleMedium">Select a local model</PaperText>
         </View>
         <BottomSheetFlatList

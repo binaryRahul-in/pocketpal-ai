@@ -48,6 +48,12 @@ export const createStyles = (theme: MD3Theme) =>
     menu: {
       width: 170,
     },
+    deleteMenuLabel: {
+      color: theme.colors.error,
+    },
+    cancelText: {
+      color: theme.colors.primary,
+    },
     sessionItem: {
       position: 'relative',
     },

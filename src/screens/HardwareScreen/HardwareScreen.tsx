@@ -21,6 +21,7 @@ import {
 } from '../../utils/deviceCapabilities';
 import {Model} from '../../utils/types';
 import {ROUTES} from '../../utils/navigationConstants';
+import {createStyles} from './styles';
 import {
   buildRecommendations,
   formatBytes,
@@ -28,18 +29,20 @@ import {
   HardwareSnapshot,
 } from '../../services/modelRecommendations';
 
-const HardwareRow = ({label, value}: {label: string; value: string}) => (
-  <View
-    style={{
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-      gap: 16,
-      paddingVertical: 7,
-    }}>
-    <Text variant="labelMedium" style={{flex: 1}}>
+const HardwareRow = ({
+  label,
+  value,
+  styles,
+}: {
+  label: string;
+  value: string;
+  styles: ReturnType<typeof createStyles>;
+}) => (
+  <View style={styles.hardwareRow}>
+    <Text variant="labelMedium" style={styles.hardwareRowLabel}>
       {label}
     </Text>
-    <Text variant="bodyMedium" style={{flex: 2, textAlign: 'right'}}>
+    <Text variant="bodyMedium" style={styles.hardwareRowValue}>
       {value}
     </Text>
   </View>
@@ -47,6 +50,7 @@ const HardwareRow = ({label, value}: {label: string; value: string}) => (
 
 export const HardwareScreen: React.FC = observer(() => {
   const theme = useTheme();
+  const styles = createStyles(theme);
   const navigation = useNavigation<any>();
   const [snapshot, setSnapshot] = useState<HardwareSnapshot | null>(null);
   const [loading, setLoading] = useState(true);
@@ -111,19 +115,17 @@ export const HardwareScreen: React.FC = observer(() => {
   };
 
   return (
-    <ScrollView contentContainerStyle={{padding: 16, paddingBottom: 32}}>
-      <Text variant="headlineSmall" style={{marginBottom: 6}}>
+    <ScrollView contentContainerStyle={styles.scrollContent}>
+      <Text variant="headlineSmall" style={styles.title}>
         Hardware & recommendations
       </Text>
-      <Text
-        variant="bodyMedium"
-        style={{color: theme.colors.onSurfaceVariant, marginBottom: 16}}>
+      <Text variant="bodyMedium" style={styles.description}>
         These are conservative estimates based on device memory, storage, CPU
         cores, and the metadata available for each model. Actual speed varies by
         phone and model.
       </Text>
 
-      <Card mode="outlined" style={{marginBottom: 16}}>
+      <Card mode="outlined" style={styles.card}>
         <Card.Title title="Device information" />
         <Card.Content>
           {loading ? (
@@ -133,32 +135,43 @@ export const HardwareScreen: React.FC = observer(() => {
               <HardwareRow
                 label="Device"
                 value={`${snapshot.brand} ${snapshot.model}`}
+                styles={styles}
               />
               <HardwareRow
                 label="Android / API"
                 value={`${snapshot.androidVersion} / ${snapshot.apiLevel}`}
+                styles={styles}
               />
               <HardwareRow
                 label="CPU architecture"
                 value={snapshot.abis.join(', ') || 'Unknown'}
+                styles={styles}
               />
               <HardwareRow
                 label="CPU cores"
                 value={String(snapshot.cores || 'Unknown')}
+                styles={styles}
               />
               <HardwareRow
                 label="Total memory"
                 value={formatBytes(snapshot.totalMemory)}
+                styles={styles}
               />
               <HardwareRow
                 label="Free storage"
                 value={formatBytes(snapshot.freeStorage)}
+                styles={styles}
               />
-              <HardwareRow label="Chipset" value={snapshot.chipset} />
-              <HardwareRow label="GPU" value={snapshot.gpu} />
+              <HardwareRow
+                label="Chipset"
+                value={snapshot.chipset}
+                styles={styles}
+              />
+              <HardwareRow label="GPU" value={snapshot.gpu} styles={styles} />
               <HardwareRow
                 label="Acceleration"
                 value={snapshot.gpuAcceleration}
+                styles={styles}
               />
             </>
           ) : (
@@ -167,7 +180,7 @@ export const HardwareScreen: React.FC = observer(() => {
         </Card.Content>
       </Card>
 
-      <Card mode="outlined" style={{marginBottom: 16}}>
+      <Card mode="outlined" style={styles.card}>
         <Card.Title title="Recommended local models" />
         <Card.Content>
           {recommendations.length === 0 ? (
@@ -177,32 +190,26 @@ export const HardwareScreen: React.FC = observer(() => {
             </Text>
           ) : (
             recommendations.map(({model, label, reason}) => (
-              <View key={model.id} style={{paddingVertical: 10}}>
-                <View
-                  style={{
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    gap: 8,
-                  }}>
-                  <Text variant="titleMedium" style={{flex: 1}}>
+              <View key={model.id} style={styles.recommendationItem}>
+                <View style={styles.recommendationHeader}>
+                  <Text
+                    variant="titleMedium"
+                    style={styles.recommendationTitle}>
                     {model.name}
                   </Text>
                   <Chip compact>{label}</Chip>
                 </View>
-                <Text
-                  variant="bodySmall"
-                  style={{color: theme.colors.onSurfaceVariant, marginTop: 4}}>
+                <Text variant="bodySmall" style={styles.recommendationMetadata}>
                   {formatBytes(getModelSize(model))} ·{' '}
                   {model.author || 'Unknown provider'}
                 </Text>
-                <Text variant="bodySmall" style={{marginTop: 4}}>
+                <Text variant="bodySmall" style={styles.reason}>
                   {reason}
                 </Text>
                 <Button
                   mode={model.isDownloaded ? 'outlined' : 'contained'}
                   compact
-                  style={{alignSelf: 'flex-start', marginTop: 8}}
+                  style={styles.downloadButton}
                   loading={downloadingId === model.id}
                   disabled={
                     downloadingId !== null || label === 'Not recommended'
@@ -210,7 +217,7 @@ export const HardwareScreen: React.FC = observer(() => {
                   onPress={() => handleDownload(model)}>
                   {model.isDownloaded ? 'Open in Models' : 'Download in app'}
                 </Button>
-                <Divider style={{marginTop: 12}} />
+                <Divider style={styles.recommendationDivider} />
               </View>
             ))
           )}

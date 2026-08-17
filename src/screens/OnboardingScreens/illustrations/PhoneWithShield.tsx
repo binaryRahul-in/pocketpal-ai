@@ -1,4 +1,5 @@
 import React from 'react';
+import {StyleSheet} from 'react-native';
 import Svg, {Rect} from 'react-native-svg';
 
 import {ShieldGlyph} from '../../../assets/onboarding/illustrations';
@@ -8,6 +9,15 @@ export type PhoneWithShieldProps = {
   /** Outer width in RN points; height scales to keep aspect 85:143. */
   width?: number;
 };
+
+const createStyles = (width: number, height: number, shieldSize: number) =>
+  StyleSheet.create({
+    shield: {
+      position: 'absolute',
+      top: (49.8 / 143) * height,
+      left: (width - shieldSize) / 2,
+    },
+  });
 
 /**
  * Screen 4 illustration — phone outline (rounded rect, thick dark
@@ -24,6 +34,7 @@ export const PhoneWithShield: React.FC<PhoneWithShieldProps> = ({
   const viewBoxH = 143;
   const height = (width * viewBoxH) / viewBoxW;
   const shieldSize = (41 / viewBoxW) * width;
+  const styles = createStyles(width, height, shieldSize);
   return (
     <>
       <Svg
@@ -56,11 +67,7 @@ export const PhoneWithShield: React.FC<PhoneWithShieldProps> = ({
       <ShieldGlyph
         width={shieldSize}
         height={shieldSize}
-        style={{
-          position: 'absolute',
-          top: (49.8 / viewBoxH) * height,
-          left: (width - shieldSize) / 2,
-        }}
+        style={styles.shield}
       />
     </>
   );

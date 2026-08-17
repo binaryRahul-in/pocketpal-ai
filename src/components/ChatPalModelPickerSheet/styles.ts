@@ -20,6 +20,10 @@ export const createStyles = ({theme}: {theme: Theme}) =>
       textAlign: 'center',
       marginVertical: 16,
     },
+    modelPickerHeader: {
+      paddingHorizontal: 16,
+      paddingBottom: 8,
+    },
     tabs: {
       flexDirection: 'row',
       paddingHorizontal: 16,

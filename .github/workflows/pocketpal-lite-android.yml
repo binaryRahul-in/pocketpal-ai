@@ -18,12 +18,12 @@ jobs:
 
     steps:
       - name: Check out source
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: '22.21.0'
           cache: yarn
@@ -41,7 +41,7 @@ jobs:
           cache: gradle
 
       - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
+        uses: android-actions/setup-android@v4
 
       - name: Install Android SDK packages
         run: |
@@ -96,7 +96,7 @@ jobs:
           sha256sum MobiGPT-debug-universal.apk | tee MobiGPT-debug-universal.apk.sha256
 
       - name: Upload MobiGPT debug APK
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: MobiGPT-debug-universal
           path: |

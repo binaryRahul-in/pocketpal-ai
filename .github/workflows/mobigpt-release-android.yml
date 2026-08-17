@@ -39,10 +39,10 @@ jobs:
     timeout-minutes: 20
     steps:
       - name: Check out source
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: yarn
@@ -77,12 +77,12 @@ jobs:
           - x86_64
     steps:
       - name: Check out source
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: yarn
@@ -98,7 +98,7 @@ jobs:
           cache: gradle
 
       - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
+        uses: android-actions/setup-android@v4
 
       - name: Install Android SDK packages
         run: |
@@ -168,7 +168,7 @@ jobs:
           du -h "MobiGPT-release-${{ matrix.abi }}.apk" | tee "MobiGPT-release-${{ matrix.abi }}.size.txt"
 
       - name: Upload optimized ABI APK
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: MobiGPT-release-${{ matrix.abi }}
           path: |
@@ -187,10 +187,17 @@ jobs:
     timeout-minutes: 25
     steps:
       - name: Download x86_64 release APK
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: MobiGPT-release-x86_64
           path: release
+
+      - name: Enable KVM group permissions
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+          test -r /dev/kvm && test -w /dev/kvm
 
       - name: Install and launch optimized APK in emulator
         uses: reactivecircus/android-emulator-runner@v2
@@ -228,12 +235,12 @@ jobs:
     timeout-minutes: 60
     steps:
       - name: Check out source
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: yarn
@@ -249,7 +256,7 @@ jobs:
           cache: gradle
 
       - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
+        uses: android-actions/setup-android@v4
 
       - name: Install Android SDK packages
         run: |
@@ -316,7 +323,7 @@ jobs:
           du -h "$AAB" | tee MobiGPT-release.aab.size.txt
 
       - name: Upload release AAB and bundletool inspection
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: MobiGPT-release-bundle-validation
           path: |
@@ -345,14 +352,14 @@ jobs:
         run: test -n "${{ inputs.release-tag }}"
 
       - name: Download validated release artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           pattern: MobiGPT-release-*
           merge-multiple: true
           path: release-assets
 
       - name: Publish GitHub prerelease
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           tag_name: ${{ github.event_name == 'push' && github.ref_name || inputs.release-tag }}
           name: MobiGPT ${{ github.event_name == 'push' && github.ref_name || inputs.release-tag }}
