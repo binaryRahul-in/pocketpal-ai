@@ -193,3 +193,19 @@ The supplied avatar is a personal portrait. Before distributing MobiGPT publicly
 [3]: https://developer.android.com/topic/performance/app-optimization/enable-app-optimization "Android Developers — Enable app optimization with R8"
 [4]: https://developer.android.com/tools/bundletool "Android Developers — bundletool"
 [5]: https://github.com/google/bundletool/releases "Google bundletool releases"
+
+## 11. Final release validation and crash forensics
+
+The first KVM-enabled validation run, [32019453149](https://github.com/BinaryRahul/pocketpal-ai/actions/runs/32019453149), proved that the emulator booted, the x86_64 optimized APK installed, and `monkey` launched `com.pocketpallite`. It did not reach an application crash: `reactivecircus/android-emulator-runner` executes each newline in its `script` input as a separate `/usr/bin/sh -c` command, so the multiline `if` statement was parsed without its `fi` and returned exit code 2. The repair is commit `5fe4ddb`, which keeps the PID/logcat conditional on one shell line.
+
+The corrected run [32021644307](https://github.com/BinaryRahul/pocketpal-ai/actions/runs/32021644307) completed successfully. JavaScript validation, both optimized release APK matrix jobs, AAB/bundletool inspection, and the x86_64 emulator startup smoke test all passed. This establishes that the reported immediate-close behavior was not reproduced by the optimized release artifact under the validated CI launch path; the prior failure was a smoke-test harness defect, not evidence of an R8 launch crash.
+
+| Artifact | CI result | Size | SHA-256 |
+|---|---|---:|---|
+| `MobiGPT-release-arm64-v8a.apk` | optimized `prodRelease`; ABI metadata check passed | 145M | `a39fbbcb2b7776cdfd2905679f49bd814303704434b026cdb8f784f39263e185` |
+| `MobiGPT-release-x86_64.apk` | optimized `prodRelease`; ABI metadata check passed and emulator smoke test passed | 103M | `da36c77b6ec399502ab9595b1e171e81a397a7d9d298a8eb3e2fe6cc5acc2fac` |
+| `MobiGPT-release.aab` | optimized `prodRelease`; bundletool device-specific APK generation and size inspection passed | 105M | `84d8ef438f1ff8a6e3881db8a54b59edde8ec9468f29a4a1fb53172335eac556` |
+
+The release run’s retained artifacts are `MobiGPT-release-arm64-v8a` (artifact ID `9285990571`), `MobiGPT-release-x86_64` (artifact ID `9286032612`), and `MobiGPT-release-bundle-validation` (artifact ID `9286195726`). The APK artifact archives are approximately 69.4 MB and 50.2 MB respectively; these archive sizes differ from the extracted APK sizes because GitHub compresses artifact ZIPs.
+
+The build still exposed two upstream WatermelonDB Java `[removal]` annotations for its legacy `onCatalystInstanceDestroy()` callback. The callback is a known non-breaking deprecation in WatermelonDB’s upstream source, so the repository now carries a narrowly scoped `patch-package` suppression in `patches/@nozbe+watermelondb+0.28.0.patch`. This suppresses compiler noise without changing callback behavior or disabling R8. The patch should be removed when a WatermelonDB release removes the legacy override.
