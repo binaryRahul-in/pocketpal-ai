@@ -1,0 +1,112 @@
+name: RVC Foundation Checks
+
+on:
+  pull_request:
+    paths:
+      - 'src/services/rvc/**'
+      - 'docs/RVC_ARCHITECTURE.md'
+      - 'package.json'
+      - 'yarn.lock'
+      - '.github/workflows/rvc-ci.yml'
+      - 'android/**'
+  push:
+    branches:
+      - pocketpal-lite
+      - integration/rvc
+    paths:
+      - 'src/services/rvc/**'
+      - 'docs/RVC_ARCHITECTURE.md'
+      - 'package.json'
+      - 'yarn.lock'
+      - '.github/workflows/rvc-ci.yml'
+      - 'android/**'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: rvc-ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  rvc-contracts:
+    name: RVC contracts and unit tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22.21.0'
+          cache: yarn
+
+      - name: Enable Corepack and Yarn
+        run: |
+          corepack enable
+          yarn --version
+
+      - name: Install dependencies
+        run: yarn install --frozen-lockfile --ignore-engines
+
+      - name: TypeScript type check
+        run: yarn typecheck
+
+      - name: Run RVC unit tests
+        run: yarn jest src/services/rvc --runInBand --coverage=false
+
+      - name: Check for credential-like content in tracked files
+        shell: bash
+        run: |
+          if git grep -nE '(GITHUB_PAT|MANUS_KING_API_KEY|GEMINI_API_KEY|WORKER_API_KEYS)\s*=' -- ':!docs/RVC_ARCHITECTURE.md'; then
+            echo 'credential-like assignment found in tracked source'
+            exit 1
+          fi
+
+  android-disabled-build:
+    name: Android RVC-disabled build
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22.21.0'
+          cache: yarn
+
+      - name: Enable Corepack and Yarn
+        run: corepack enable
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: gradle
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android SDK packages
+        run: |
+          sdkmanager "platform-tools" "platforms;android-36" "build-tools;36.0.0" "ndk;27.3.13750724" "cmake;3.22.1"
+          yes | sdkmanager --licenses >/dev/null || true
+
+      - name: Install dependencies
+        run: yarn install --frozen-lockfile --ignore-engines
+
+      - name: Create CI-only environment configuration
+        run: |
+          cat > .env <<'EOF'
+          ENABLE_RVC=false
+          ENABLE_OFFLINE_MODE=true
+          EOF
+
+      - name: Build unsigned Android debug APK
+        working-directory: android
+        run: ./gradlew assembleProdDebug --no-daemon --stacktrace

@@ -13,3 +13,6 @@ export {
 export type {AuthState, Profile} from './palshub/AuthService';
 export type {ErrorInfo} from './palshub/ErrorHandler';
 export type {SyncProgress} from './palshub/SyncService';
+
+// Optional RVC inference
+export * from './rvc';

@@ -2,6 +2,7 @@
   "name": "PocketPal",
   "version": "1.16.1",
   "private": true,
+  "onnxruntimeExtensionsEnabled": "true",
   "scripts": {
     "prepare": "husky",
     "postinstall": "./scripts/postinstall.sh",
