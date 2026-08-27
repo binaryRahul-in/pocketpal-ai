@@ -1,0 +1,68 @@
+name: RVC Fixture Gates
+
+on:
+  pull_request:
+    paths:
+      - 'src/services/rvc/**'
+      - 'src/specs/NativeRvcModule.ts'
+      - '**/*.cpp'
+      - '**/*.cc'
+      - '**/*.h'
+      - 'native/**'
+      - 'models/**'
+      - 'config/**'
+      - '**/*manifest*.json'
+      - 'ci/fixtures/**'
+      - 'ci/native/**'
+      - '.github/workflows/rvc-fixture.yml'
+  push:
+    branches: [main, pocketpal-lite]
+    paths:
+      - 'src/services/rvc/**'
+      - 'src/specs/NativeRvcModule.ts'
+      - '**/*.cpp'
+      - '**/*.cc'
+      - '**/*.h'
+      - 'native/**'
+      - 'models/**'
+      - 'config/**'
+      - '**/*manifest*.json'
+      - 'ci/fixtures/**'
+      - 'ci/native/**'
+      - '.github/workflows/rvc-fixture.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: rvc-fixture-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  native:
+    name: RVC native fixture tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compile and run native fixture
+        run: |
+          g++ -std=c++17 -Wall -Wextra -Werror ci/native/rvc_fixture_test.cpp -o /tmp/rvc_fixture_test
+          /tmp/rvc_fixture_test
+
+  model:
+    name: RVC model manifest and ONNX fixture
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate manifest and smoke test
+        run: |
+          node ci/validate-model-manifest.js ci/fixtures/rvc-model-manifest.json
+          node ci/onnx-fixture-smoke.js ci/fixtures/rvc-fixture.onnx.json
+      - name: Preserve validation reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: rvc-fixture-reports
+          path: ci/fixtures/*.report.json
+          if-no-files-found: ignore

@@ -1,0 +1,196 @@
+name: CI Baseline
+
+on:
+  push:
+    branches: [main, pocketpal-lite]
+    paths:
+      - '**/*.js'
+      - '**/*.ts'
+      - '**/*.tsx'
+      - 'android/**'
+      - 'ios/**'
+      - 'ci/**'
+      - 'package.json'
+      - 'yarn.lock'
+      - '.github/workflows/ci-baseline.yml'
+  pull_request:
+    paths:
+      - '**/*.js'
+      - '**/*.ts'
+      - '**/*.tsx'
+      - 'android/**'
+      - 'ios/**'
+      - 'ci/**'
+      - 'package.json'
+      - 'yarn.lock'
+      - '.github/workflows/ci-baseline.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-baseline-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  NODE_VERSION: '22.21.0'
+
+jobs:
+  javascript:
+    name: JS lint, typecheck, and unit tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: yarn
+      - name: Install dependencies
+        run: corepack enable && yarn install --frozen-lockfile
+      - name: Lint
+        run: yarn lint
+      - name: Typecheck
+        run: yarn typecheck
+      - name: Unit tests with coverage
+        run: yarn test --runInBand --coverage
+      - name: Upload JS reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: js-test-reports
+          path: |
+            coverage/
+            junit.xml
+          if-no-files-found: ignore
+
+  android-compile:
+    name: Android compile
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: yarn
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: gradle
+      - name: Install JavaScript dependencies
+        run: corepack enable && yarn install --frozen-lockfile
+      - name: Assemble production debug APK
+        working-directory: android
+        run: ./gradlew assembleProdDebug --stacktrace
+      - name: Upload Android build reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-compile-reports
+          path: |
+            android/app/build/reports/
+            android/app/build/outputs/apk/**/*.apk
+          if-no-files-found: ignore
+
+  ios-compile:
+    name: iOS compile (licensed runner)
+    runs-on: macos-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: yarn
+      - name: Install JavaScript dependencies
+        run: corepack enable && yarn install --frozen-lockfile
+      - name: Install CocoaPods dependencies
+        run: cd ios && pod install --deployment
+      - name: Compile iOS simulator target
+        run: |
+          set -o pipefail
+          xcodebuild -workspace ios/PocketPal.xcworkspace -scheme PocketPal \
+            -configuration Debug -sdk iphonesimulator \
+            -destination 'generic/platform=iOS Simulator' \
+            CODE_SIGNING_ALLOWED=NO COMPILER_INDEX_STORE_ENABLE=NO | tee ios-build.log
+      - name: Upload iOS build log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-compile-reports
+          path: ios-build.log
+          if-no-files-found: ignore
+
+  native-fixture:
+    name: Native C++ fixture tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compile native fixture test
+        run: g++ -std=c++17 -Wall -Wextra -Werror ci/native/rvc_fixture_test.cpp -o ci/native/rvc_fixture_test
+      - name: Run native fixture test
+        run: ci/native/rvc_fixture_test
+
+  model-manifest:
+    name: Model manifest and fixture ONNX smoke test
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate manifests without downloading weights
+        run: node ci/validate-model-manifest.js ci/fixtures/rvc-model-manifest.json
+      - name: Run fixture-only ONNX smoke test
+        run: node ci/onnx-fixture-smoke.js ci/fixtures/rvc-fixture.onnx.json
+      - name: Upload manifest and smoke logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: model-validation-reports
+          path: ci/fixtures/*.report.json
+          if-no-files-found: ignore
+
+  compliance:
+    name: License and dependency audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: yarn
+      - name: Install dependencies
+        run: corepack enable && yarn install --frozen-lockfile
+      - name: License inventory
+        run: yarn licenses list --json > license-report.json
+      - name: Dependency audit (high severity)
+        run: yarn audit --level high --groups dependencies
+      - name: Upload compliance reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: compliance-reports
+          path: license-report.json
+
+  artifact-size:
+    name: Artifact size report
+    runs-on: ubuntu-latest
+    needs: [javascript, android-compile, native-fixture, model-manifest]
+    if: always()
+    steps:
+      - uses: actions/checkout@v4
+      - name: Measure tracked source and fixture sizes
+        run: |
+          mkdir -p ci/reports
+          { echo '## CI artifact-size report'; echo; echo '| Path | Bytes |'; echo '| --- | ---: |'; \
+            find ci android ios -type f -not -path '*/build/*' -not -path '*/Pods/*' -printf '| %p | %s |\n' 2>/dev/null | sort; } > ci/reports/artifact-size.md
+          du -sh ci android ios 2>/dev/null | tee ci/reports/artifact-size.txt
+      - name: Upload artifact size report
+        uses: actions/upload-artifact@v4
+        with:
+          name: artifact-size-report
+          path: ci/reports/

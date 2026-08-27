@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "models": [
+    {
+      "id": "rvc-fixture",
+      "format": "onnx",
+      "path": "ci/fixtures/rvc-fixture.onnx.json",
+      "sha256": "fixture-only-not-a-download",
+      "license": "MIT",
+      "weights": {
+        "remote": false,
+        "sizeBytes": 0
+      }
+    }
+  ]
+}

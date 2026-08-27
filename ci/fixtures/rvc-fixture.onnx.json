@@ -1,0 +1,12 @@
+{
+  "irVersion": 8,
+  "producerName": "pocketpal-ci-fixture",
+  "graph": {
+    "name": "rvc_fixture_add",
+    "inputs": [{"name": "x", "shape": [1], "type": "float32"}],
+    "nodes": [{"opType": "Add", "inputs": ["x", "bias"], "outputs": ["y"]}],
+    "initializers": [{"name": "bias", "data": [0.25]}],
+    "outputs": [{"name": "y", "shape": [1], "type": "float32"}]
+  },
+  "weights": {"embedded": true, "sizeBytes": 4}
+}
