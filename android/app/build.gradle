@@ -83,6 +83,28 @@ def jscFlavor = 'io.github.react-native-community:jsc-android:2026004.+'
 // Optional CI/release ABI selector. When omitted, development builds keep both
 // supported ABIs; release CI passes -PtargetAbi=arm64-v8a or x86_64.
 def targetAbi = project.findProperty("targetAbi")?.toString()
+def rvcOrtVersion = "1.24.3"
+def rvcOrtRoot = file("$buildDir/rvc-ort")
+
+configurations {
+    rvcOrtRuntime
+}
+
+tasks.register("extractRvcOrt", Sync) {
+    from(configurations.rvcOrtRuntime.collect { zipTree(it) }) {
+        include "headers/**"
+        include "jni/**"
+    }
+    into(rvcOrtRoot)
+}
+
+afterEvaluate {
+    tasks.matching { task ->
+        task.name.contains("externalNative") || task.name.contains("CMake")
+    }.configureEach {
+        dependsOn(tasks.named("extractRvcOrt"))
+    }
+}
 
 android {
     ndkVersion rootProject.ext.ndkVersion
@@ -111,6 +133,7 @@ android {
             // shim) into libappmodules.so. The replacement file must
             // include ReactNative-application.cmake — see jni/CMakeLists.txt.
             path file("src/main/jni/CMakeLists.txt")
+            arguments "-DRVC_ORT_ROOT=${rvcOrtRoot.absolutePath}"
         }
     }
     signingConfigs {
@@ -186,6 +209,11 @@ android {
         }
     }
 
+    packagingOptions {
+        pickFirst "**/libonnxruntime.so"
+        pickFirst "**/libc++_shared.so"
+    }
+
     // Keep the variant matrix narrow: only prodDebug, prodRelease,
     // e2eDebug, and e2eReleaseE2e are valid combinations.
     //   - e2e + release  → unsigned E2E APK nobody asked for; drop it
@@ -245,6 +273,12 @@ dependencies {
 
     // OkHttp for DownloadModule (network requests)
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
+
+    // Pinned native artifact used by the C++ RVC runner. The React Native
+    // package uses the same version; packaging pickFirst below prevents the
+    // identical shared object from being emitted twice.
+    rvcOrtRuntime "com.microsoft.onnxruntime:onnxruntime-android:${rvcOrtVersion}@aar"
+    implementation "com.microsoft.onnxruntime:onnxruntime-android:${rvcOrtVersion}"
 }
 
 project.ext.vectoricons = [

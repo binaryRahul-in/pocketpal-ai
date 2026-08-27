@@ -1,6 +1,5 @@
 package com.pocketpal
 
-import android.os.Build
 import com.facebook.react.bridge.Arguments
 import com.facebook.react.bridge.Promise
 import com.facebook.react.bridge.ReactApplicationContext
@@ -13,16 +12,28 @@ class RvcRuntimeModule(reactContext: ReactApplicationContext) : NativeRvcRuntime
   private var streaming = false
   private var cancelled = false
 
+  init {
+    try {
+      System.loadLibrary("appmodules")
+    } catch (_: UnsatisfiedLinkError) {
+      // React Native may load the library later through SoLoader. The native
+      // call reports a structured failure instead of crashing the JS bridge.
+    }
+  }
+
+  private external fun nativeRunModelSmoke(modelPath: String): String
+
   override fun getName(): String = NativeRvcRuntimeSpec.NAME
 
   override fun getCapabilities(promise: Promise) {
     val result = Arguments.createMap()
     result.putBoolean("supported", true)
     result.putBoolean("streaming", false)
-    result.putString("provider", "cpu")
+    result.putString("provider", "onnxruntime-cpu-cpp")
     result.putString("precision", "fp32")
     result.putArray("warnings", Arguments.createArray().apply {
-      pushString("Native streaming is staged behind the validated offline ONNX Runtime path.")
+      pushString("Native C++ ONNX tensor execution is available for validated local .onnx graphs.")
+      pushString("Streaming AudioTrack conversion remains disabled until bounded end-to-end audio validation is complete.")
     })
     promise.resolve(result)
   }
@@ -47,7 +58,21 @@ class RvcRuntimeModule(reactContext: ReactApplicationContext) : NativeRvcRuntime
   }
 
   override fun convert(inputPath: String, outputPath: String, modelRootPath: String, optionsJson: String, promise: Promise) {
-    promise.reject("RVC_NATIVE_NOT_READY", "The native streaming backend is not enabled; use offline ONNX Runtime conversion.")
+    try {
+      val root = File(modelRootPath).canonicalFile
+      val model = File(inputPath).canonicalFile
+      val rootPrefix = root.path + File.separator
+      require(model.path.startsWith(rootPrefix)) { "ONNX model must be inside the selected RVC model directory" }
+      require(model.isFile) { "ONNX model file does not exist" }
+      require(model.extension.equals("onnx", ignoreCase = true)) { "Native C++ execution accepts only .onnx model files" }
+      require(model.length() in 1..512L * 1024L * 1024L) { "ONNX model size is outside the mobile safety limit" }
+
+      val summary = nativeRunModelSmoke(model.path)
+      require(summary.contains("\"valid\":true")) { "Native ONNX execution failed: $summary" }
+      promise.resolve(summary)
+    } catch (error: Exception) {
+      promise.reject("RVC_NATIVE_INFERENCE_FAILED", error.message, error)
+    }
   }
 
   override fun startStreaming(modelRootPath: String, optionsJson: String, promise: Promise) {

@@ -9,25 +9,42 @@
 #
 # Why our extra source lives in a subdirectory: RN's template at
 # default-app-setup/ReactNative-application.cmake does
-# `file(GLOB *.cpp)` non-recursively in this directory, treating the
-# presence of any *.cpp here as "user owns OnLoad.cpp too." Keeping
-# `hardware_info.cpp` under src/ leaves that glob empty so the upstream
-# default-app-setup/OnLoad.cpp (PlatformConstants + autolinked
-# TurboModules + Fabric registry) keeps being picked up. We then add
-# our source explicitly via `target_sources` after the include.
-# Net effect: no vendored Meta code, nothing to resync on RN bumps.
+# `file(GLOB *.cpp)` non-recursively in this directory, treating
+# the presence of any *.cpp here as "user owns OnLoad.cpp too."
+# Keeping sources under `src/` leaves that glob empty so the upstream
+# default-app-setup/OnLoad.cpp keeps being picked up. We then add our
+# sources explicitly via `target_sources` after the include.
 
 cmake_minimum_required(VERSION 3.13)
-
-# Library name expected by RN; do not rename — SoLoader maps it at startup.
 project(appmodules)
 
 include(${REACT_ANDROID_DIR}/cmake-utils/ReactNative-application.cmake)
 
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
+
+if(NOT DEFINED RVC_ORT_ROOT OR RVC_ORT_ROOT STREQUAL "")
+    message(FATAL_ERROR "RVC_ORT_ROOT must point to the extracted ONNX Runtime Android AAR")
+endif()
+
+file(GLOB RVC_ORT_INCLUDE_DIRS "${RVC_ORT_ROOT}/headers")
+file(GLOB RVC_ORT_LIBRARY_DIRS "${RVC_ORT_ROOT}/jni/${ANDROID_ABI}")
+if(NOT RVC_ORT_INCLUDE_DIRS OR NOT RVC_ORT_LIBRARY_DIRS)
+    message(FATAL_ERROR "Missing ONNX Runtime headers or native library for ${ANDROID_ABI}")
+endif()
+
+find_library(log-lib log)
+find_library(onnxruntime-lib onnxruntime PATHS ${RVC_ORT_LIBRARY_DIRS} NO_DEFAULT_PATH)
+if(NOT onnxruntime-lib)
+    message(FATAL_ERROR "Could not find libonnxruntime.so for ${ANDROID_ABI}")
+endif()
+
 target_sources(${CMAKE_PROJECT_NAME} PRIVATE
     src/hardware_info.cpp
     src/rvc_stream_queue.cpp
+    src/rvc_onnx_runner.cpp
 )
 
-find_library(log-lib log)
-target_link_libraries(${CMAKE_PROJECT_NAME} ${log-lib})
+target_include_directories(${CMAKE_PROJECT_NAME} PRIVATE ${RVC_ORT_INCLUDE_DIRS})
+target_link_libraries(${CMAKE_PROJECT_NAME} ${onnxruntime-lib} ${log-lib})

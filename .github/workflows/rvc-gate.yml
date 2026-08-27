@@ -17,6 +17,40 @@ env:
   JAVA_VERSION: '17'
 
 jobs:
+  native-cpp-smoke:
+    name: Native C++ ONNX tensor smoke
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up C++ toolchain
+        run: sudo apt-get update && sudo apt-get install -y g++
+
+      - name: Download pinned ONNX Runtime host package
+        run: |
+          set -euo pipefail
+          mkdir -p .ci/onnxruntime
+          curl --fail --location --retry 3 \
+            -o .ci/onnxruntime/onnxruntime.tgz \
+            https://github.com/microsoft/onnxruntime/releases/download/v1.24.3/onnxruntime-linux-x64-1.24.3.tgz
+          tar -xzf .ci/onnxruntime/onnxruntime.tgz -C .ci/onnxruntime
+
+      - name: Compile and execute native ONNX smoke
+        run: |
+          set -euo pipefail
+          ORT="$PWD/.ci/onnxruntime/onnxruntime-linux-x64-1.24.3"
+          mkdir -p .ci/bin
+          g++ -std=c++17 -O2 \
+            -I"$ORT/include" \
+            android/app/src/main/jni/src/rvc_onnx_runner.cpp \
+            tools/rvc_native_fixture/native_smoke_main.cpp \
+            -L"$ORT/lib" -lonnxruntime \
+            -Wl,-rpath,"$ORT/lib" \
+            -o .ci/bin/rvc_native_smoke
+          .ci/bin/rvc_native_smoke tools/rvc_native_fixture/rvc_native_fixture.onnx
+
   rvc-gate:
     name: RVC gate and focused tests
     runs-on: ubuntu-latest
@@ -49,7 +83,9 @@ jobs:
     name: Android prod debug build
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    needs: rvc-gate
+    needs:
+      - native-cpp-smoke
+      - rvc-gate
     steps:
       - name: Check out source
         uses: actions/checkout@v4
