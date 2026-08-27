@@ -30,7 +30,11 @@ export interface RvcConversionResult {
 export interface RvcNativeModule {
   loadModel(modelPath: string, config: RvcConfig): Promise<RvcModelHandle>;
   unloadModel(modelId: string): Promise<void>;
-  convertFile(modelId: string, input: RvcAudioInput, onProgress?: (event: RvcProgressEvent) => void): Promise<RvcConversionResult>;
+  convertFile(
+    modelId: string,
+    input: RvcAudioInput,
+    onProgress?: (event: RvcProgressEvent) => void,
+  ): Promise<RvcConversionResult>;
   startStream(modelId: string, config: RvcConfig): Promise<void>;
   pushAudioChunk(chunk: RvcAudioChunk): Promise<RvcConversionResult>;
   flush(): Promise<RvcConversionResult>;

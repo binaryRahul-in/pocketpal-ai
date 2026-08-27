@@ -33,47 +33,78 @@ describe('RVC domain contracts', () => {
   };
 
   it('represents both speech-to-speech and TTS-to-RVC profiles', () => {
-    expect(manifest.supportedInputModes).toEqual(['speech-to-speech', 'tts-to-rvc']);
+    expect(manifest.supportedInputModes).toEqual([
+      'speech-to-speech',
+      'tts-to-rvc',
+    ]);
     expect(validateRvcProfile(profile, manifest).f0Method).toBe('rmvpe');
   });
 
   it('rejects a positive index rate without an installed index', () => {
-    expect(() => validateRvcConfig({
-      sampleRate: 40000,
-      modelVersion: 'v2',
-      f0Method: 'rmvpe',
-      indexMode: 'none',
-      indexRate: 0.1,
-      chunkDurationMs: 160,
-      executionProvider: 'cpu',
-      quantization: 'fp32',
-    })).toThrow(RvcContractError);
+    expect(() =>
+      validateRvcConfig({
+        sampleRate: 40000,
+        modelVersion: 'v2',
+        f0Method: 'rmvpe',
+        indexMode: 'none',
+        indexRate: 0.1,
+        chunkDurationMs: 160,
+        executionProvider: 'cpu',
+        quantization: 'fp32',
+      }),
+    ).toThrow(RvcContractError);
   });
 
   it('rejects positive index rate when the manifest has no index', () => {
-    const {index: _index, ...withoutIndex} = manifest;
-    expect(() => validateRvcConfig({
-      sampleRate: 40000,
-      modelVersion: 'v2',
-      f0Method: 'rmvpe',
-      indexMode: 'local',
-      indexRate: 0.1,
-      chunkDurationMs: 160,
-      executionProvider: 'cpu',
-      quantization: 'fp32',
-    }, withoutIndex)).toThrow('requires an installed index');
+    const withoutIndex = {...manifest};
+    delete withoutIndex.index;
+    expect(() =>
+      validateRvcConfig(
+        {
+          sampleRate: 40000,
+          modelVersion: 'v2',
+          f0Method: 'rmvpe',
+          indexMode: 'local',
+          indexRate: 0.1,
+          chunkDurationMs: 160,
+          executionProvider: 'cpu',
+          quantization: 'fp32',
+        },
+        withoutIndex,
+      ),
+    ).toThrow('requires an installed index');
   });
 
   it('allows zero index rate with no index', () => {
-    expect(() => validateRvcConfig({
-      sampleRate: 40000,
-      modelVersion: 'v2',
-      f0Method: 'rmvpe',
-      indexMode: 'none',
-      indexRate: 0,
-      chunkDurationMs: 160,
-      executionProvider: 'cpu',
-      quantization: 'fp32',
-    })).not.toThrow();
+    expect(() =>
+      validateRvcConfig({
+        sampleRate: 40000,
+        modelVersion: 'v2',
+        f0Method: 'rmvpe',
+        indexMode: 'none',
+        indexRate: 0,
+        chunkDurationMs: 160,
+        executionProvider: 'cpu',
+        quantization: 'fp32',
+      }),
+    ).not.toThrow();
+  });
+
+  it('rejects a pitch extractor that the manifest does not support', () => {
+    expect(() =>
+      validateRvcConfig(
+        {
+          sampleRate: 40000,
+          modelVersion: 'v2',
+          f0Method: 'harvest',
+          indexMode: 'none',
+          indexRate: 0,
+          chunkDurationMs: 160,
+          executionProvider: 'cpu',
+          quantization: 'fp32',
+        },
+        manifest,
+      ),
+    ).toThrow('not supported by the model');
   });
 });

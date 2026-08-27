@@ -8,9 +8,20 @@
 export type PitchExtractorKind = 'harvest' | 'rmvpe' | 'crepe' | 'fcpe';
 export type RvcInputMode = 'speech-to-speech' | 'tts-to-rvc';
 export type RvcIndexMode = 'none' | 'local' | 'external';
-export type RvcExecutionProvider = 'cpu' | 'coreml' | 'nnapi' | 'cuda' | 'vulkan';
+export type RvcExecutionProvider =
+  | 'cpu'
+  | 'coreml'
+  | 'nnapi'
+  | 'cuda'
+  | 'vulkan';
 export type RvcQuantization = 'fp32' | 'fp16' | 'int8';
-export type RvcProgressPhase = 'loading' | 'converting' | 'streaming' | 'flushing' | 'complete' | 'cancelled';
+export type RvcProgressPhase =
+  | 'loading'
+  | 'converting'
+  | 'streaming'
+  | 'flushing'
+  | 'complete'
+  | 'cancelled';
 
 export interface RvcIndexManifest {
   path: string;
@@ -90,7 +101,10 @@ export interface RvcCapabilities {
   sampleRates: readonly number[];
   maxMemoryBytes?: number;
   latency?: RvcLatencyMetrics;
-  reason?: 'module-unavailable' | 'unsupported-platform' | 'initialization-failed';
+  reason?:
+    | 'module-unavailable'
+    | 'unsupported-platform'
+    | 'initialization-failed';
 }
 
 export type RvcErrorCode =
@@ -121,14 +135,30 @@ export class RvcContractError extends Error implements RvcError {
   }
 }
 
-export function validateRvcConfig(config: RvcConfig, manifest?: RvcModelManifest): void {
+export function validateRvcConfig(
+  config: RvcConfig,
+  manifest?: RvcModelManifest,
+): void {
   if (!Number.isFinite(config.sampleRate) || config.sampleRate <= 0) {
-    throw new RvcContractError('INVALID_CONFIG', 'sampleRate must be a positive finite number.');
+    throw new RvcContractError(
+      'INVALID_CONFIG',
+      'sampleRate must be a positive finite number.',
+    );
   }
-  if (!Number.isFinite(config.indexRate) || config.indexRate < 0 || config.indexRate > 1) {
-    throw new RvcContractError('INVALID_CONFIG', 'indexRate must be between 0 and 1.');
+  if (
+    !Number.isFinite(config.indexRate) ||
+    config.indexRate < 0 ||
+    config.indexRate > 1
+  ) {
+    throw new RvcContractError(
+      'INVALID_CONFIG',
+      'indexRate must be between 0 and 1.',
+    );
   }
-  if (config.indexRate > 0 && (config.indexMode === 'none' || !manifest?.index)) {
+  if (
+    config.indexRate > 0 &&
+    (config.indexMode === 'none' || !manifest?.index)
+  ) {
     throw new RvcContractError(
       'INVALID_CONFIG',
       'indexRate greater than zero requires an installed index and a non-none indexMode.',
@@ -137,25 +167,63 @@ export function validateRvcConfig(config: RvcConfig, manifest?: RvcModelManifest
     );
   }
   if (!Number.isFinite(config.chunkDurationMs) || config.chunkDurationMs <= 0) {
-    throw new RvcContractError('INVALID_CONFIG', 'chunkDurationMs must be a positive finite number.');
+    throw new RvcContractError(
+      'INVALID_CONFIG',
+      'chunkDurationMs must be a positive finite number.',
+    );
   }
-  if (config.memoryBudgetBytes !== undefined && (!Number.isSafeInteger(config.memoryBudgetBytes) || config.memoryBudgetBytes <= 0)) {
-    throw new RvcContractError('INVALID_CONFIG', 'memoryBudgetBytes must be a positive safe integer.');
+  if (
+    config.memoryBudgetBytes !== undefined &&
+    (!Number.isSafeInteger(config.memoryBudgetBytes) ||
+      config.memoryBudgetBytes <= 0)
+  ) {
+    throw new RvcContractError(
+      'INVALID_CONFIG',
+      'memoryBudgetBytes must be a positive safe integer.',
+    );
   }
-  if (manifest && (manifest.modelVersion !== config.modelVersion || manifest.sampleRate !== config.sampleRate)) {
-    throw new RvcContractError('MODEL_INCOMPATIBLE', 'The model manifest does not match the RVC configuration.');
+  if (
+    manifest &&
+    !manifest.supportedPitchExtractors.includes(config.f0Method)
+  ) {
+    throw new RvcContractError(
+      'MODEL_INCOMPATIBLE',
+      'The selected pitch extractor is not supported by the model.',
+    );
+  }
+  if (
+    manifest &&
+    (manifest.modelVersion !== config.modelVersion ||
+      manifest.sampleRate !== config.sampleRate)
+  ) {
+    throw new RvcContractError(
+      'MODEL_INCOMPATIBLE',
+      'The model manifest does not match the RVC configuration.',
+    );
   }
 }
 
-export function validateRvcProfile(profile: RvcProfile, manifest: RvcModelManifest): RvcConfig {
+export function validateRvcProfile(
+  profile: RvcProfile,
+  manifest: RvcModelManifest,
+): RvcConfig {
   if (profile.modelId !== manifest.id) {
-    throw new RvcContractError('MODEL_INCOMPATIBLE', 'The profile references a different model.');
+    throw new RvcContractError(
+      'MODEL_INCOMPATIBLE',
+      'The profile references a different model.',
+    );
   }
   if (!manifest.supportedPitchExtractors.includes(profile.pitchExtractor)) {
-    throw new RvcContractError('MODEL_INCOMPATIBLE', 'The selected pitch extractor is not supported by the model.');
+    throw new RvcContractError(
+      'MODEL_INCOMPATIBLE',
+      'The selected pitch extractor is not supported by the model.',
+    );
   }
   if (!manifest.supportedInputModes.includes(profile.inputMode)) {
-    throw new RvcContractError('MODEL_INCOMPATIBLE', 'The selected input mode is not supported by the model.');
+    throw new RvcContractError(
+      'MODEL_INCOMPATIBLE',
+      'The selected input mode is not supported by the model.',
+    );
   }
   const config: RvcConfig = {
     sampleRate: manifest.sampleRate,
