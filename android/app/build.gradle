@@ -102,10 +102,10 @@ tasks.register("extractRvcOrt") {
                 include "jni/**"
             }
         }
-        if (!file("$rvcOrtRoot/headers/onnxruntime_cxx_api.h").isFile) {
+        if (!file("$rvcOrtRoot/headers/onnxruntime_cxx_api.h").isFile()) {
             throw new GradleException("Pinned ONNX Runtime AAR did not contain C++ headers")
         }
-        if (!file("$rvcOrtRoot/jni/arm64-v8a/libonnxruntime.so").isFile) {
+        if (!file("$rvcOrtRoot/jni/arm64-v8a/libonnxruntime.so").isFile()) {
             throw new GradleException("Pinned ONNX Runtime AAR did not contain arm64-v8a libonnxruntime.so")
         }
     }
