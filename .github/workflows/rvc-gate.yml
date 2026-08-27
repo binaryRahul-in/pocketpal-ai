@@ -2,7 +2,6 @@ name: RVC Gate
 
 on:
   push:
-    branches: [main, pocketpal-lite]
     paths:
       - 'src/**'
       - 'scripts/rvc-*.js'
