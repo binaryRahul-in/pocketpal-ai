@@ -207,14 +207,38 @@ auto Session::Run(const std::vector<Tensor> &inputs, std::vector<Tensor> *output
     auto result = impl_->session->Run(Ort::RunOptions{nullptr}, names.data(), values.data(), values.size(), output_names.data(), output_names.size());
     outputs->clear();
     for (size_t i = 0; i < result.size(); ++i) {
-      auto shape = result[i].GetTensorTypeAndShapeInfo().GetShape();
-      auto bytes = result[i].GetTensorTypeAndShapeInfo().GetElementCount() * sizeof(float);
-      const auto *data = result[i].GetTensorData<float>();
+      const auto type_info = result[i].GetTensorTypeAndShapeInfo();
+      const auto element_count = type_info.GetElementCount();
+      const auto element_type = type_info.GetElementType();
+      size_t element_size = 0;
+      switch (element_type) {
+      case ONNX_TENSOR_ELEMENT_DATA_TYPE_FLOAT:
+        element_size = sizeof(float);
+        break;
+      case ONNX_TENSOR_ELEMENT_DATA_TYPE_INT64:
+        element_size = sizeof(int64_t);
+        break;
+      case ONNX_TENSOR_ELEMENT_DATA_TYPE_UINT8:
+        element_size = sizeof(uint8_t);
+        break;
+      default:
+        throw std::runtime_error("unsupported ONNX output element type");
+      }
+      const auto bytes = element_count * element_size;
+      const auto *data = result[i].GetTensorRawData();
       Tensor output;
-      output.name = output_names[i]; output.shape = std::move(shape); output.bytes.resize(bytes);
-      std::memcpy(output.bytes.data(), data, bytes); outputs->push_back(std::move(output));
+      output.name = output_names[i];
+      output.shape = type_info.GetShape();
+      output.type = element_type == ONNX_TENSOR_ELEMENT_DATA_TYPE_FLOAT
+                        ? ElementType::Float32
+                        : element_type == ONNX_TENSOR_ELEMENT_DATA_TYPE_INT64
+                            ? ElementType::Int64
+                            : ElementType::UInt8;
+      output.bytes.resize(bytes);
+      std::memcpy(output.bytes.data(), data, bytes);
+      outputs->push_back(std::move(output));
     }
-  } catch (const Ort::Exception &error) {
+  } catch (const std::exception &error) {
     impl_->diagnostics.error = error.what();
     if (diagnostics) *diagnostics = impl_->diagnostics;
     return false;

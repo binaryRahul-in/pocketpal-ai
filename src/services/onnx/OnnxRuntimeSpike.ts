@@ -1,6 +1,10 @@
 import {NativeModules, Platform} from 'react-native';
 
-export type OnnxProvider = 'CPUExecutionProvider' | 'XNNPACKExecutionProvider' | 'NNAPIExecutionProvider' | 'CoreMLExecutionProvider';
+export type OnnxProvider =
+  | 'CPUExecutionProvider'
+  | 'XNNPACKExecutionProvider'
+  | 'NNAPIExecutionProvider'
+  | 'CoreMLExecutionProvider';
 
 export type OnnxDiagnostics = {
   requestedProvider: OnnxProvider;
@@ -13,20 +17,34 @@ export type OnnxDiagnostics = {
 };
 
 type OnnxRuntimeSpikeModule = {
-  inspectFixture(modelPath: string, requestedProvider: OnnxProvider, quantized: boolean): Promise<OnnxDiagnostics>;
+  inspectFixture(
+    modelPath: string,
+    requestedProvider: OnnxProvider,
+    quantized: boolean,
+  ): Promise<OnnxDiagnostics>;
   cancel(): void;
 };
 
-const nativeModule = NativeModules.OnnxRuntimeSpike as OnnxRuntimeSpikeModule | undefined;
+const nativeModule = NativeModules.OnnxRuntimeSpike as
+  | OnnxRuntimeSpikeModule
+  | undefined;
 
 export const onnxRuntimeSpike = {
-  inspectFixture: async (modelPath: string, requestedProvider: OnnxProvider = Platform.OS === 'ios' ? 'CoreMLExecutionProvider' : 'XNNPACKExecutionProvider', quantized = false) => {
+  inspectFixture: async (
+    modelPath: string,
+    requestedProvider: OnnxProvider = Platform.OS === 'ios'
+      ? 'CoreMLExecutionProvider'
+      : 'XNNPACKExecutionProvider',
+    quantized = false,
+  ) => {
     if (!nativeModule) {
       return {
         requestedProvider,
         selectedProvider: 'CPUExecutionProvider' as const,
         availableProviders: ['CPUExecutionProvider' as const],
-        fallbackReasons: ['OnnxRuntimeSpike native module is unavailable in this build'],
+        fallbackReasons: [
+          'OnnxRuntimeSpike native module is unavailable in this build',
+        ],
         initialized: false,
         cancelled: false,
       } satisfies OnnxDiagnostics;
