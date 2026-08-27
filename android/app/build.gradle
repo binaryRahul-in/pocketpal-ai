@@ -94,6 +94,7 @@ android {
         applicationId "com.pocketpallite"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
+        testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         versionCode 143
         versionName "1.16.1"
         ndk {
@@ -245,6 +246,13 @@ dependencies {
 
     // OkHttp for DownloadModule (network requests)
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
+
+    // Android-only ONNX Runtime spike. This is deliberately kept out of the
+    // React Native API surface; the instrumentation test exercises the
+    // supported Android Java API and provider fallback behavior directly.
+    implementation "com.microsoft.onnxruntime:onnxruntime-android:1.24.3"
+    androidTestImplementation "androidx.test:runner:1.6.2"
+    androidTestImplementation "androidx.test.ext:junit:1.2.1"
 }
 
 project.ext.vectoricons = [
