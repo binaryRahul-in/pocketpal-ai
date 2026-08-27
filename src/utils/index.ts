@@ -865,5 +865,6 @@ export * from './network';
 export * from './types';
 export * from './hf';
 export * from './hfResolve';
+export * from './rvcModelManifest';
 export * from './hfUserAgent';
 export * from './safeAlert';
