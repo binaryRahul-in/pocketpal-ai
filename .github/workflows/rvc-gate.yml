@@ -99,7 +99,7 @@ jobs:
 
       - name: Build Android prod debug
         working-directory: android
-        run: ./gradlew assembleProdDebug --no-daemon
+        run: ./gradlew assembleProdDebug --no-daemon --stacktrace
 
       - name: Verify RVC weights are absent from APK
         run: |
