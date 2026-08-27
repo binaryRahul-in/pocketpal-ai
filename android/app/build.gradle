@@ -99,9 +99,7 @@ tasks.register("extractRvcOrt", Sync) {
 }
 
 afterEvaluate {
-    tasks.matching { task ->
-        task.name.contains("externalNative") || task.name.contains("CMake")
-    }.configureEach {
+    tasks.named("preBuild").configure {
         dependsOn(tasks.named("extractRvcOrt"))
     }
 }
