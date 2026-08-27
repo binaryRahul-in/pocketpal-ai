@@ -29,16 +29,12 @@ if(NOT DEFINED RVC_ORT_ROOT OR RVC_ORT_ROOT STREQUAL "")
 endif()
 
 file(GLOB RVC_ORT_INCLUDE_DIRS "${RVC_ORT_ROOT}/headers")
-file(GLOB RVC_ORT_LIBRARY_DIRS "${RVC_ORT_ROOT}/jni/${ANDROID_ABI}")
-if(NOT RVC_ORT_INCLUDE_DIRS OR NOT RVC_ORT_LIBRARY_DIRS)
-    message(FATAL_ERROR "Missing ONNX Runtime headers or native library for ${ANDROID_ABI}")
+set(onnxruntime-lib "${RVC_ORT_ROOT}/jni/${ANDROID_ABI}/libonnxruntime.so")
+if(NOT RVC_ORT_INCLUDE_DIRS OR NOT EXISTS "${onnxruntime-lib}")
+    message(FATAL_ERROR "Missing ONNX Runtime headers or native library for ${ANDROID_ABI}: ${onnxruntime-lib}")
 endif()
 
 find_library(log-lib log)
-find_library(onnxruntime-lib onnxruntime PATHS ${RVC_ORT_LIBRARY_DIRS} NO_DEFAULT_PATH)
-if(NOT onnxruntime-lib)
-    message(FATAL_ERROR "Could not find libonnxruntime.so for ${ANDROID_ABI}")
-endif()
 
 target_sources(${CMAKE_PROJECT_NAME} PRIVATE
     src/hardware_info.cpp

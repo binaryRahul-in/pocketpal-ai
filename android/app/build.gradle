@@ -90,12 +90,25 @@ configurations {
     rvcOrtRuntime
 }
 
-tasks.register("extractRvcOrt", Sync) {
-    from(configurations.rvcOrtRuntime.collect { zipTree(it) }) {
-        include "headers/**"
-        include "jni/**"
+tasks.register("extractRvcOrt") {
+    outputs.dir(rvcOrtRoot)
+    doLast {
+        delete(rvcOrtRoot)
+        configurations.rvcOrtRuntime.files.each { aar ->
+            copy {
+                from(zipTree(aar))
+                into(rvcOrtRoot)
+                include "headers/**"
+                include "jni/**"
+            }
+        }
+        if (!file("$rvcOrtRoot/headers/onnxruntime_cxx_api.h").isFile) {
+            throw new GradleException("Pinned ONNX Runtime AAR did not contain C++ headers")
+        }
+        if (!file("$rvcOrtRoot/jni/arm64-v8a/libonnxruntime.so").isFile) {
+            throw new GradleException("Pinned ONNX Runtime AAR did not contain arm64-v8a libonnxruntime.so")
+        }
     }
-    into(rvcOrtRoot)
 }
 
 afterEvaluate {
