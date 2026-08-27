@@ -6,6 +6,7 @@ import type {
   RvcConversionResult,
   RvcModelManifest,
   RvcProvider,
+  RvcPitchExtractor,
   RvcRuntime,
   RvcValidationReport,
 } from '../../types/rvc';
@@ -292,10 +293,20 @@ export class OrtRvcRuntime implements RvcRuntime {
     const sessions = await this.ensureSessions(request.model);
     const features = await this.extractContent(sessions.contentvec, source16k);
     await this.checkCancelled();
+    const configuredPitch = this.dependencies.config.pitchExtractor;
     const f0 = sessions.pitch
       ? await this.extractPitch(sessions.pitch, source16k, features.length)
-      : new Float32Array(features.length);
+      : this.extractNativePitch(source16k, features.length, configuredPitch);
+    if (request.pitchShiftSemitones) {
+      const factor = 2 ** (request.pitchShiftSemitones / 12);
+      for (let index = 0; index < f0.length; index += 1) {
+        if (f0[index] > 0) f0[index] *= factor;
+      }
+    }
     await this.checkCancelled();
+    // Retrieval indexes are intentionally not loaded by the mobile runtime.
+    // `indexRate = 0` is the safe default; enabling it requires a separately
+    // validated native retrieval implementation and bounded memory budget.
     const coarse = this.f0ToCoarse(f0);
     const waveform = await this.synthesize(
       sessions.netG,
@@ -359,8 +370,8 @@ export class OrtRvcRuntime implements RvcRuntime {
       {executionProviders: providers},
     );
     const pitch =
-      model.manifest.pitch.kind === 'rmvpe' ||
-      model.manifest.pitch.kind === 'fcpe'
+      ['rmvpe', 'fcpe'].includes(this.dependencies.config.pitchExtractor) &&
+      model.manifest.pitch.kind === this.dependencies.config.pitchExtractor
         ? await ort.InferenceSession.create(
             resolveSafeModelPath(
               model.rootPath,
@@ -442,6 +453,49 @@ export class OrtRvcRuntime implements RvcRuntime {
         weightTotal > 0.003
           ? 32.7 * 2 ** (((weighted / weightTotal) * 20) / 1200)
           : 0;
+    }
+    return f0;
+  }
+
+  private extractNativePitch(
+    audio: Float32Array,
+    frameCount: number,
+    extractor: RvcPitchExtractor,
+  ): Float32Array {
+    const f0 = new Float32Array(frameCount);
+    if (extractor === 'rmvpe' || extractor === 'fcpe') return f0;
+    const frameSize = Math.max(
+      160,
+      Math.floor(audio.length / Math.max(1, frameCount)),
+    );
+    const minLag = Math.floor(16000 / 1100);
+    const maxLag = Math.floor(16000 / 50);
+    for (let frame = 0; frame < frameCount; frame += 1) {
+      const start = Math.min(audio.length - 1, frame * frameSize);
+      const end = Math.min(audio.length, start + frameSize);
+      if (end - start < 32) continue;
+      let bestLag = 0;
+      let bestScore = 0;
+      for (
+        let lag = minLag;
+        lag <= Math.min(maxLag, end - start - 1);
+        lag += 1
+      ) {
+        let energy = 0;
+        let correlation = 0;
+        for (let index = start; index + lag < end; index += 1) {
+          const left = audio[index];
+          const right = audio[index + lag];
+          energy += left * left + right * right;
+          correlation += left * right;
+        }
+        const score = energy > 1e-8 ? correlation / energy : 0;
+        if (score > bestScore) {
+          bestScore = score;
+          bestLag = lag;
+        }
+      }
+      if (bestLag > 0 && bestScore > 0.25) f0[frame] = 16000 / bestLag;
     }
     return f0;
   }
