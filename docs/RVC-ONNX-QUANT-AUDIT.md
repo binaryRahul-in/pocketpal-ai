@@ -29,14 +29,14 @@ The exporter creates a tiny deterministic graph for smoke testing only. It is no
 
 ## Component matrix and shipping decisions
 
-| Component | RVC role | v1/v2 compatibility | Quantization experiment | Default shipping decision |
-|---|---|---|---|---|
-| ContentVec | Produces content embeddings consumed by `net_g` | Do not mix v1 and v2 feature dimensions or checkpoints | Dynamic INT8 and static QDQ | Candidate only after parity and quality gates |
-| RMVPE | Produces f0 and voicing contour | Match sample rate and hop length | No INT8 by default | Keep FP32; pitch errors are high risk |
-| Per-voice `net_g` | Synthesizes waveform from units, f0, and speaker conditioning | One artifact and metadata set per voice/model version | No INT8 by default | Keep FP32 until audio parity passes |
-| Optional retrieval/index | Blends nearest feature vectors | Index must match ContentVec family and feature space | Not applicable | Preserve native index; audit lookup separately |
-| Preprocessing | Resampling, normalization, framing, f0 preparation | Must match the model contract | Native/fp32 | Keep deterministic native code |
-| Postprocessing | Overlap-add, denormalization, waveform encoding | Must preserve expected sample rate | Native/fp32 | Keep deterministic native code |
+| Component                | RVC role                                                      | v1/v2 compatibility                                    | Quantization experiment     | Default shipping decision                      |
+| ------------------------ | ------------------------------------------------------------- | ------------------------------------------------------ | --------------------------- | ---------------------------------------------- |
+| ContentVec               | Produces content embeddings consumed by `net_g`               | Do not mix v1 and v2 feature dimensions or checkpoints | Dynamic INT8 and static QDQ | Candidate only after parity and quality gates  |
+| RMVPE                    | Produces f0 and voicing contour                               | Match sample rate and hop length                       | No INT8 by default          | Keep FP32; pitch errors are high risk          |
+| Per-voice `net_g`        | Synthesizes waveform from units, f0, and speaker conditioning | One artifact and metadata set per voice/model version  | No INT8 by default          | Keep FP32 until audio parity passes            |
+| Optional retrieval/index | Blends nearest feature vectors                                | Index must match ContentVec family and feature space   | Not applicable              | Preserve native index; audit lookup separately |
+| Preprocessing            | Resampling, normalization, framing, f0 preparation            | Must match the model contract                          | Native/fp32                 | Keep deterministic native code                 |
+| Postprocessing           | Overlap-add, denormalization, waveform encoding               | Must preserve expected sample rate                     | Native/fp32                 | Keep deterministic native code                 |
 
 The initial safe policy is intentionally conservative: **only ContentVec is an INT8 experiment candidate**. A report must state any accepted or rejected QDQ/dynamic experiment and every excluded operator. `net_g`, RMVPE, and the audio boundary remain FP32 unless a later report supplies numeric, audio, latency, and quality evidence.
 
