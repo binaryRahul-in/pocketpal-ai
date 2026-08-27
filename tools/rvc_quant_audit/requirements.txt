@@ -1,0 +1,4 @@
+# Host-only conversion and audit dependencies. Never add these to the mobile app.
+numpy>=1.24,<3
+onnx>=1.16,<2
+onnxruntime>=1.18,<2
