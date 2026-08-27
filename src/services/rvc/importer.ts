@@ -47,6 +47,8 @@ export async function pickAndInstallRvcModel(
     ) as {engine?: string; files?: Array<{path?: string}>};
     if (manifest.engine !== 'rvc' || !manifest.files?.length)
       throw new Error('manifest.json is not an RVC model manifest.');
+    if (manifest.files.some(file => !file.path || file.path.includes('/')))
+      throw new Error('Local picker import currently accepts a flat bundle; choose manifest.json and the three ONNX files from one directory.');
     const displayName = id;
     return await manager.install({
       id,
