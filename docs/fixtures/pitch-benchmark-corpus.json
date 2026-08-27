@@ -1,0 +1,39 @@
+{
+  "schemaVersion": "1.0",
+  "description": "Metadata for the offline pitch extractor benchmark. PCM and RMVPE references are supplied by the benchmark runner.",
+  "sampleRateHz": 16000,
+  "hopLength": 160,
+  "cases": [
+    {
+      "id": "voiced-steady",
+      "fixture": "voiced-steady.pcm16",
+      "reference": "rmvpe/voiced-steady.f0.json"
+    },
+    {
+      "id": "unvoiced-consonants",
+      "fixture": "unvoiced-consonants.pcm16",
+      "reference": "rmvpe/unvoiced-consonants.f0.json"
+    },
+    {
+      "id": "register-transition",
+      "fixture": "register-transition.pcm16",
+      "reference": "rmvpe/register-transition.f0.json"
+    },
+    {
+      "id": "vibrato",
+      "fixture": "vibrato.pcm16",
+      "reference": "rmvpe/vibrato.f0.json"
+    },
+    {
+      "id": "chunk-boundary",
+      "fixture": "chunk-boundary.pcm16",
+      "reference": "rmvpe/chunk-boundary.f0.json"
+    }
+  ],
+  "deviceProfile": {
+    "name": "low-end-android-proxy",
+    "cpu": "4 logical cores",
+    "ramBytes": 2147483648,
+    "notes": "Run on the sandbox host as a documented proxy; replace with physical Android model, ABI, API, and thermal state for release evidence."
+  }
+}
