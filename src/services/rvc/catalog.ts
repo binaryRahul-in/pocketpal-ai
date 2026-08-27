@@ -1,5 +1,6 @@
 import {validateRvcManifest} from './modelManifest';
 import {RvcModelManifest} from './types';
+import type {RvcHardwarePolicy} from './hardwarePolicy';
 
 export type RvcModelOrigin = 'curated' | 'user-import';
 
@@ -16,11 +17,14 @@ export interface RvcInstallPolicyInput {
   manifestBytes: number;
   deviceSupported: boolean;
   offlineMode: boolean;
+  /** Optional measured hardware decision. Omitted for legacy catalog callers. */
+  hardwarePolicy?: RvcHardwarePolicy;
 }
 
 export interface RvcInstallDecision {
   allowed: boolean;
   reasons: string[];
+  warnings: string[];
 }
 
 export function createRvcCatalogEntry(
@@ -60,7 +64,14 @@ export function evaluateRvcInstallPolicy(
   if (input.offlineMode && input.manifestBytes === 0) {
     reasons.push('offline installation requires a complete local bundle');
   }
-  return {allowed: reasons.length === 0, reasons};
+  const warnings =
+    input.hardwarePolicy?.warnings.map(warning => warning.message) ?? [];
+  if (input.hardwarePolicy && !input.hardwarePolicy.canInstall) {
+    reasons.push(
+      'measured device capability requirements are not satisfied; decline installation to continue using PocketPal normally',
+    );
+  }
+  return {allowed: reasons.length === 0, reasons, warnings};
 }
 
 export function setRvcEnabled(
