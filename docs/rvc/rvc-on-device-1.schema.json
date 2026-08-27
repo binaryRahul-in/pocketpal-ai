@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pocketpal.ai/schemas/rvc-on-device/1",
+  "title": "RVC on-device manifest v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["manifestVersion", "artifact", "modelFamily", "generation", "sampleRate", "featureExtractor", "featureDimension", "pitchExtractor", "quantization", "indexPresent", "tensors"],
+  "properties": {
+    "manifestVersion": {"const": "rvc-on-device/1"},
+    "artifact": {"type": "object", "additionalProperties": false, "required": ["path", "format", "sha256", "license", "sourceUrl"], "properties": {"path": {"type": "string", "pattern": "\\.onnx$"}, "format": {"const": "onnx"}, "sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"}, "license": {"type": "string", "minLength": 1}, "sourceUrl": {"type": "string", "format": "uri", "pattern": "^https?://"}}},
+    "modelFamily": {"const": "net_g_vits"},
+    "generation": {"enum": ["v1", "v2"]},
+    "sampleRate": {"enum": [40000, 48000]},
+    "featureExtractor": {"enum": ["contentvec", "hubert"]},
+    "featureDimension": {"enum": [256, 768]},
+    "pitchExtractor": {"enum": ["rmvpe", "fcpe"]},
+    "quantization": {"enum": ["fp32", "int8"]},
+    "indexPresent": {"type": "boolean"},
+    "tensors": {"type": "array", "minItems": 1, "items": {"type": "object", "additionalProperties": false, "required": ["name", "shape"], "properties": {"name": {"type": "string", "minLength": 1}, "shape": {"type": "array", "minItems": 1, "items": {"type": "integer", "minimum": -1}}}}}
+  }
+}
