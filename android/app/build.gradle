@@ -112,8 +112,9 @@ android {
     compileSdk rootProject.ext.compileSdkVersion
 
     namespace "com.pocketpal"
-    defaultConfig {
+        defaultConfig {
         applicationId "com.pocketpallite"
+
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 143
@@ -125,6 +126,11 @@ android {
                 abiFilters "arm64-v8a", "x86_64"
             }
         }
+        externalNativeBuild {
+            cmake {
+                arguments "-DRVC_ORT_ROOT=${rvcOrtRoot.absolutePath}"
+            }
+        }
     }
     externalNativeBuild {
         cmake {
@@ -133,7 +139,6 @@ android {
             // shim) into libappmodules.so. The replacement file must
             // include ReactNative-application.cmake — see jni/CMakeLists.txt.
             path file("src/main/jni/CMakeLists.txt")
-            arguments "-DRVC_ORT_ROOT=${rvcOrtRoot.absolutePath}"
         }
     }
     signingConfigs {
