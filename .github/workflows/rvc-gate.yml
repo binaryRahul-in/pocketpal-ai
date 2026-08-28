@@ -147,6 +147,14 @@ jobs:
             exit 1
           fi
 
+      - name: Upload prod-debug APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: rvc-gate-prod-debug-apk
+          path: android/app/build/outputs/apk/prod/debug/app-prod-debug.apk
+          if-no-files-found: error
+          retention-days: 7
+
   android-release:
     name: Android x86_64 release APK build
     runs-on: ubuntu-latest
