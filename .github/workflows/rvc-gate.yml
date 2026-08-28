@@ -264,7 +264,7 @@ jobs:
           emulator-options: -no-window -no-audio -no-boot-anim -no-snapshot -gpu swiftshader_indirect
           disable-animations: true
           script: |
-            set -euo pipefail
+            set -eu
             adb install -r release/app-prod-release.apk
             adb shell am force-stop com.pocketpallite
             adb shell monkey -p com.pocketpallite 1
