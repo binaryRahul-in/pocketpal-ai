@@ -265,7 +265,7 @@ jobs:
           disable-animations: true
           script: |
             set -eu
-            APK=$(find . -type f -name 'app-prod-release.apk' -print -quit)
+            APK=$(find "$GITHUB_WORKSPACE/release" -type f -name 'app-prod-release.apk' -print -quit)
             test -n "$APK"
             adb install -r "$APK"
             adb shell am force-stop com.pocketpallite
