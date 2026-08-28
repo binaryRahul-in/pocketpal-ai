@@ -146,3 +146,140 @@ jobs:
             echo 'RVC weights must not be bundled in the application APK.'
             exit 1
           fi
+
+  android-release:
+    name: Android x86_64 release APK build
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    needs:
+      - native-cpp-smoke
+      - rvc-gate
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: yarn
+
+      - name: Enable Corepack and Yarn
+        run: |
+          corepack enable
+          yarn --version
+
+      - name: Install JavaScript dependencies
+        run: yarn install --frozen-lockfile
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: ${{ env.JAVA_VERSION }}
+          distribution: temurin
+          cache: gradle
+
+      - name: Create CI Android service configuration
+        run: |
+          cat > android/app/google-services.json <<'JSON'
+          {
+            "project_info": {"project_number": "000000000000", "project_id": "rvc-ci", "storage_bucket": "rvc-ci.appspot.com"},
+            "client": [{
+              "client_info": {"mobilesdk_app_id": "1:000000000000:android:0000000000000000", "android_client_info": {"package_name": "com.pocketpallite"}},
+              "api_key": [{"current_key": "rvc-ci-dummy-key"}]
+            }]
+          }
+          JSON
+          cat > .env <<'ENV'
+          FIREBASE_FUNCTIONS_URL=https://rvc-ci.invalid
+          SUPABASE_URL=https://rvc-ci.invalid
+          SUPABASE_ANON_KEY=rvc-ci-dummy-key
+          PALSHUB_API_BASE_URL=https://rvc-ci.invalid
+          APP_URL=pocketpal://app
+          ENABLE_PALSHUB_INTEGRATION=false
+          ENABLE_AUTHENTICATION=false
+          ENABLE_OFFLINE_MODE=true
+          ENV
+
+      - name: Build Android x86_64 release APK
+        working-directory: android
+        run: ./gradlew assembleProdRelease -PtargetAbi=x86_64 -PreactNativeArchitectures=x86_64 --no-daemon --stacktrace
+
+      - name: Inspect release APK and reject bundled model weights
+        shell: bash
+        run: |
+          set -euo pipefail
+          APK=android/app/build/outputs/apk/prod/release/app-prod-release.apk
+          test -s "$APK"
+          AAPT2=$(find "$ANDROID_HOME/build-tools" -type f -name aapt2 | sort | tail -1)
+          "$AAPT2" dump badging "$APK" | tee release-badging.txt
+          grep -q "package: name='com.pocketpallite'" release-badging.txt
+          grep -q "application-label:'MobiGPT'" release-badging.txt
+          test "$(unzip -Z1 "$APK" | awk -F/ '$1 == "lib" && NF >= 2 {print $2}' | sort -u)" = "x86_64"
+          if unzip -l "$APK" | grep -E '\.(onnx|pth|pt|index)( |$)'; then
+            echo 'RVC weights must not be bundled in the release APK.'
+            exit 1
+          fi
+
+      - name: Upload release APK smoke artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: rvc-gate-release-x86_64
+          path: |
+            android/app/build/outputs/apk/prod/release/app-prod-release.apk
+            release-badging.txt
+          if-no-files-found: error
+          retention-days: 7
+
+  whole-app-smoke:
+    name: Whole-app Android release startup smoke
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    needs: android-release
+    steps:
+      - name: Download release APK
+        uses: actions/download-artifact@v4
+        with:
+          name: rvc-gate-release-x86_64
+          path: release
+
+      - name: Enable KVM group permissions
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+          test -r /dev/kvm && test -w /dev/kvm
+
+      - name: Install, launch, and inspect the whole app
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          target: google_apis
+          arch: x86_64
+          profile: pixel_2
+          cores: 2
+          ram-size: 2048M
+          heap-size: 512M
+          emulator-boot-timeout: 900
+          force-avd-creation: true
+          emulator-options: -no-window -no-audio -no-boot-anim -no-snapshot -gpu swiftshader_indirect
+          disable-animations: false
+          script: |
+            set -euo pipefail
+            adb install -r release/app-prod-release.apk
+            adb shell am force-stop com.pocketpallite
+            adb shell monkey -p com.pocketpallite 1
+            sleep 30
+            pid=$(adb shell pidof com.pocketpallite | tr -d '\r' || true)
+            if ! printf '%s' "$pid" | grep -Eq '[0-9]'; then
+              echo 'MobiGPT exited during whole-app startup smoke; collecting logcat.' >&2
+              adb logcat -d -b main -b system -b crash -v time >&2 || true
+              exit 1
+            fi
+            adb shell dumpsys activity activities | grep -q 'com.pocketpallite'
+            if adb logcat -d -b crash -v brief | grep -Eiq 'FATAL EXCEPTION|signal 11|SIGSEGV'; then
+              adb logcat -d -b main -b system -b crash -v time >&2 || true
+              exit 1
+            fi
+            echo "MobiGPT whole-app startup smoke passed with pid $pid"
+            adb shell am force-stop com.pocketpallite
