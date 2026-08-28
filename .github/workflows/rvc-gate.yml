@@ -220,13 +220,14 @@ jobs:
             echo 'RVC weights must not be bundled in the release APK.'
             exit 1
           fi
+          cp "$APK" rvc-gate-release.apk
 
       - name: Upload release APK smoke artifact
         uses: actions/upload-artifact@v4
         with:
           name: rvc-gate-release-x86_64
           path: |
-            android/app/build/outputs/apk/prod/release/app-prod-release.apk
+            rvc-gate-release.apk
             release-badging.txt
           if-no-files-found: error
           retention-days: 7
@@ -265,9 +266,8 @@ jobs:
           disable-animations: true
           script: |
             set -eu
-            APK=$(find "$GITHUB_WORKSPACE/release" -type f -name 'app-prod-release.apk' -print -quit)
-            test -n "$APK"
-            adb install -r "$APK"
+            test -s release/rvc-gate-release.apk
+            adb install -r release/rvc-gate-release.apk
             adb shell am force-stop com.pocketpallite
             adb shell monkey -p com.pocketpallite 1
             sleep 30
