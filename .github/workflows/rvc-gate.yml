@@ -265,7 +265,9 @@ jobs:
           disable-animations: true
           script: |
             set -eu
-            adb install -r release/app-prod-release.apk
+            APK=$(find release -type f -name 'app-prod-release.apk' -print -quit)
+            test -n "$APK"
+            adb install -r "$APK"
             adb shell am force-stop com.pocketpallite
             adb shell monkey -p com.pocketpallite 1
             sleep 30
