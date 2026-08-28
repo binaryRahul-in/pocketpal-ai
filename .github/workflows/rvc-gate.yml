@@ -80,9 +80,21 @@ jobs:
         run: yarn jest src/services/modelRecommendations.test.ts --runInBand --coverage=false
 
   android-debug:
-    name: Android prod debug build
+    name: Android prod debug (${{ matrix.name }})
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: all-abis
+            gradle_args: ""
+            apk_path: android/app/build/outputs/apk/prod/debug/app-prod-debug.apk
+            artifact_name: rvc-gate-prod-debug-apk
+          - name: arm64-v8a
+            gradle_args: "-PtargetAbi=arm64-v8a -PreactNativeArchitectures=arm64-v8a"
+            apk_path: android/app/build/outputs/apk/prod/debug/app-prod-debug.apk
+            artifact_name: rvc-gate-prod-debug-arm64-v8a-apk
     needs:
       - native-cpp-smoke
       - rvc-gate
@@ -135,23 +147,26 @@ jobs:
 
       - name: Build Android prod debug
         working-directory: android
-        run: ./gradlew assembleProdDebug --no-daemon --stacktrace
+        run: ./gradlew assembleProdDebug ${{ matrix.gradle_args }} --no-daemon --stacktrace
 
-      - name: Verify RVC weights are absent from APK
+      - name: Verify RVC weights and ABI are absent/present as expected
         run: |
           set -euo pipefail
-          APK=android/app/build/outputs/apk/prod/debug/app-prod-debug.apk
+          APK=${{ matrix.apk_path }}
           test -f "$APK"
           if unzip -l "$APK" | grep -E '\.(onnx|pth|pt|index)( |$)'; then
             echo 'RVC weights must not be bundled in the application APK.'
             exit 1
           fi
+          if [ '${{ matrix.name }}' = 'arm64-v8a' ]; then
+            test "$(unzip -Z1 "$APK" | awk -F/ '$1 == "lib" && NF >= 2 {print $2}' | sort -u)" = "arm64-v8a"
+          fi
 
       - name: Upload prod-debug APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: rvc-gate-prod-debug-apk
-          path: android/app/build/outputs/apk/prod/debug/app-prod-debug.apk
+          name: ${{ matrix.artifact_name }}
+          path: ${{ matrix.apk_path }}
           if-no-files-found: error
           retention-days: 7
 
