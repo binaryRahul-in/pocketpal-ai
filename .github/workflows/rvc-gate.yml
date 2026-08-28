@@ -265,22 +265,4 @@ jobs:
           emulator-options: -no-window -no-audio -no-boot-anim -no-snapshot -gpu swiftshader_indirect
           disable-animations: true
           script: |
-            set -eu
-            test -s release/rvc-gate-release.apk
-            adb install -r release/rvc-gate-release.apk
-            adb shell am force-stop com.pocketpallite
-            adb shell monkey -p com.pocketpallite 1
-            sleep 30
-            pid=$(adb shell pidof com.pocketpallite | tr -d '\r' || true)
-            if ! printf '%s' "$pid" | grep -Eq '[0-9]'; then
-              echo 'MobiGPT exited during whole-app startup smoke; collecting logcat.' >&2
-              adb logcat -d -b main -b system -b crash -v time >&2 || true
-              exit 1
-            fi
-            adb shell dumpsys activity activities | grep -q 'com.pocketpallite'
-            if adb logcat -d -b crash -v brief | grep -Eiq 'FATAL EXCEPTION|signal 11|SIGSEGV'; then
-              adb logcat -d -b main -b system -b crash -v time >&2 || true
-              exit 1
-            fi
-            echo "MobiGPT whole-app startup smoke passed with pid $pid"
-            adb shell am force-stop com.pocketpallite
+            set -eu; APK=release/rvc-gate-release.apk; test -s "$APK"; adb install -r "$APK"; adb shell am force-stop com.pocketpallite; adb shell monkey -p com.pocketpallite 1; sleep 30; pid="$(adb shell pidof com.pocketpallite | tr -d '\r' || true)"; test -n "$pid"; adb shell dumpsys activity activities | grep -q 'com.pocketpallite'; if adb logcat -d -b crash -v brief | grep -Eiq 'FATAL EXCEPTION|signal 11|SIGSEGV'; then adb logcat -d -b main -b system -b crash -v time >&2 || true; exit 1; fi; echo "MobiGPT whole-app startup smoke passed with pid $pid"; adb shell am force-stop com.pocketpallite
