@@ -8,5 +8,6 @@ export * from './FeedbackStore';
 export * from './DeepLinkStore';
 export * from './ServerStore';
 export * from './TTSStore';
+export * from './RVCStore';
 export * from './CheckoutFlowStore';
 export * from './SearchProviderStore';

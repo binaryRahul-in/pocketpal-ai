@@ -83,6 +83,39 @@ def jscFlavor = 'io.github.react-native-community:jsc-android:2026004.+'
 // Optional CI/release ABI selector. When omitted, development builds keep both
 // supported ABIs; release CI passes -PtargetAbi=arm64-v8a or x86_64.
 def targetAbi = project.findProperty("targetAbi")?.toString()
+def rvcOrtVersion = "1.24.3"
+def rvcOrtRoot = file("$buildDir/rvc-ort")
+
+configurations {
+    rvcOrtRuntime
+}
+
+tasks.register("extractRvcOrt") {
+    outputs.dir(rvcOrtRoot)
+    doLast {
+        delete(rvcOrtRoot)
+        configurations.rvcOrtRuntime.files.each { aar ->
+            copy {
+                from(zipTree(aar))
+                into(rvcOrtRoot)
+                include "headers/**"
+                include "jni/**"
+            }
+        }
+        if (!file("$rvcOrtRoot/headers/onnxruntime_cxx_api.h").isFile()) {
+            throw new GradleException("Pinned ONNX Runtime AAR did not contain C++ headers")
+        }
+        if (!file("$rvcOrtRoot/jni/arm64-v8a/libonnxruntime.so").isFile()) {
+            throw new GradleException("Pinned ONNX Runtime AAR did not contain arm64-v8a libonnxruntime.so")
+        }
+    }
+}
+
+afterEvaluate {
+    tasks.named("preBuild").configure {
+        dependsOn(tasks.named("extractRvcOrt"))
+    }
+}
 
 android {
     ndkVersion rootProject.ext.ndkVersion
@@ -90,8 +123,9 @@ android {
     compileSdk rootProject.ext.compileSdkVersion
 
     namespace "com.pocketpal"
-    defaultConfig {
+        defaultConfig {
         applicationId "com.pocketpallite"
+
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 143
@@ -101,6 +135,11 @@ android {
                 abiFilters targetAbi
             } else {
                 abiFilters "arm64-v8a", "x86_64"
+            }
+        }
+        externalNativeBuild {
+            cmake {
+                arguments "-DRVC_ORT_ROOT=${rvcOrtRoot.absolutePath}"
             }
         }
     }
@@ -186,6 +225,11 @@ android {
         }
     }
 
+    packagingOptions {
+        pickFirst "**/libonnxruntime.so"
+        pickFirst "**/libc++_shared.so"
+    }
+
     // Keep the variant matrix narrow: only prodDebug, prodRelease,
     // e2eDebug, and e2eReleaseE2e are valid combinations.
     //   - e2e + release  → unsigned E2E APK nobody asked for; drop it
@@ -245,6 +289,12 @@ dependencies {
 
     // OkHttp for DownloadModule (network requests)
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
+
+    // Pinned native artifact used by the C++ RVC runner. The React Native
+    // package uses the same version; packaging pickFirst below prevents the
+    // identical shared object from being emitted twice.
+    rvcOrtRuntime "com.microsoft.onnxruntime:onnxruntime-android:${rvcOrtVersion}@aar"
+    implementation "com.microsoft.onnxruntime:onnxruntime-android:${rvcOrtVersion}"
 }
 
 project.ext.vectoricons = [

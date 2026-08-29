@@ -1,0 +1,291 @@
+name: RVC Gate
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: rvc-gate-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  NODE_VERSION: '22.21.0'
+  JAVA_VERSION: '17'
+
+jobs:
+  native-cpp-smoke:
+    name: Native C++ ONNX tensor smoke
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up C++ toolchain
+        run: sudo apt-get update && sudo apt-get install -y g++
+
+      - name: Download pinned ONNX Runtime host package
+        run: |
+          set -euo pipefail
+          mkdir -p .ci/onnxruntime
+          curl --fail --location --retry 3 \
+            -o .ci/onnxruntime/onnxruntime.tgz \
+            https://github.com/microsoft/onnxruntime/releases/download/v1.24.3/onnxruntime-linux-x64-1.24.3.tgz
+          tar -xzf .ci/onnxruntime/onnxruntime.tgz -C .ci/onnxruntime
+
+      - name: Compile and execute native ONNX smoke
+        run: |
+          set -euo pipefail
+          ORT="$PWD/.ci/onnxruntime/onnxruntime-linux-x64-1.24.3"
+          mkdir -p .ci/bin
+          g++ -std=c++17 -O2 \
+            -I"$ORT/include" \
+            android/app/src/main/jni/src/rvc_onnx_runner.cpp \
+            tools/rvc_native_fixture/native_smoke_main.cpp \
+            -L"$ORT/lib" -lonnxruntime \
+            -Wl,-rpath,"$ORT/lib" \
+            -o .ci/bin/rvc_native_smoke
+          .ci/bin/rvc_native_smoke tools/rvc_native_fixture/rvc_native_fixture.onnx
+
+  rvc-gate:
+    name: RVC gate and focused tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: yarn
+
+      - name: Enable Corepack and Yarn
+        run: |
+          corepack enable
+          yarn --version
+
+      - name: Install JavaScript dependencies
+        run: yarn install --frozen-lockfile
+
+      - name: Run RVC gate
+        run: yarn rvc:gate
+
+      - name: Run focused regression test
+        run: yarn jest src/services/modelRecommendations.test.ts --runInBand --coverage=false
+
+  android-debug:
+    name: Android prod debug (${{ matrix.name }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: all-abis
+            gradle_args: ""
+            apk_path: android/app/build/outputs/apk/prod/debug/app-prod-debug.apk
+            artifact_name: rvc-gate-prod-debug-apk
+          - name: arm64-v8a
+            gradle_args: "-PtargetAbi=arm64-v8a -PreactNativeArchitectures=arm64-v8a"
+            apk_path: android/app/build/outputs/apk/prod/debug/app-prod-debug.apk
+            artifact_name: rvc-gate-prod-debug-arm64-v8a-apk
+    needs:
+      - native-cpp-smoke
+      - rvc-gate
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: yarn
+
+      - name: Enable Corepack and Yarn
+        run: |
+          corepack enable
+          yarn --version
+
+      - name: Install JavaScript dependencies
+        run: yarn install --frozen-lockfile
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: ${{ env.JAVA_VERSION }}
+          distribution: temurin
+          cache: gradle
+
+      - name: Create CI Android service configuration
+        run: |
+          cat > android/app/google-services.json <<'JSON'
+          {
+            "project_info": {"project_number": "000000000000", "project_id": "rvc-ci", "storage_bucket": "rvc-ci.appspot.com"},
+            "client": [{
+              "client_info": {"mobilesdk_app_id": "1:000000000000:android:0000000000000000", "android_client_info": {"package_name": "com.pocketpallite"}},
+              "api_key": [{"current_key": "rvc-ci-dummy-key"}]
+            }]
+          }
+          JSON
+          cat > .env <<'ENV'
+          FIREBASE_FUNCTIONS_URL=https://rvc-ci.invalid
+          SUPABASE_URL=https://rvc-ci.invalid
+          SUPABASE_ANON_KEY=rvc-ci-dummy-key
+          PALSHUB_API_BASE_URL=https://rvc-ci.invalid
+          APP_URL=pocketpal://app
+          ENABLE_PALSHUB_INTEGRATION=false
+          ENABLE_AUTHENTICATION=false
+          ENABLE_OFFLINE_MODE=true
+          ENV
+
+      - name: Build Android prod debug
+        working-directory: android
+        run: ./gradlew assembleProdDebug ${{ matrix.gradle_args }} --no-daemon --stacktrace
+
+      - name: Verify RVC weights and ABI are absent/present as expected
+        run: |
+          set -euo pipefail
+          APK=${{ matrix.apk_path }}
+          test -f "$APK"
+          if unzip -l "$APK" | grep -E '\.(onnx|pth|pt|index)( |$)'; then
+            echo 'RVC weights must not be bundled in the application APK.'
+            exit 1
+          fi
+          if [ '${{ matrix.name }}' = 'arm64-v8a' ]; then
+            test "$(unzip -Z1 "$APK" | awk -F/ '$1 == "lib" && NF >= 2 {print $2}' | sort -u)" = "arm64-v8a"
+          fi
+
+      - name: Upload prod-debug APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact_name }}
+          path: ${{ matrix.apk_path }}
+          if-no-files-found: error
+          retention-days: 7
+
+  android-release:
+    name: Android x86_64 release APK build
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    needs:
+      - native-cpp-smoke
+      - rvc-gate
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: yarn
+
+      - name: Enable Corepack and Yarn
+        run: |
+          corepack enable
+          yarn --version
+
+      - name: Install JavaScript dependencies
+        run: yarn install --frozen-lockfile
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: ${{ env.JAVA_VERSION }}
+          distribution: temurin
+          cache: gradle
+
+      - name: Create CI Android service configuration
+        run: |
+          cat > android/app/google-services.json <<'JSON'
+          {
+            "project_info": {"project_number": "000000000000", "project_id": "rvc-ci", "storage_bucket": "rvc-ci.appspot.com"},
+            "client": [{
+              "client_info": {"mobilesdk_app_id": "1:000000000000:android:0000000000000000", "android_client_info": {"package_name": "com.pocketpallite"}},
+              "api_key": [{"current_key": "rvc-ci-dummy-key"}]
+            }]
+          }
+          JSON
+          cat > .env <<'ENV'
+          FIREBASE_FUNCTIONS_URL=https://rvc-ci.invalid
+          SUPABASE_URL=https://rvc-ci.invalid
+          SUPABASE_ANON_KEY=rvc-ci-dummy-key
+          PALSHUB_API_BASE_URL=https://rvc-ci.invalid
+          APP_URL=pocketpal://app
+          ENABLE_PALSHUB_INTEGRATION=false
+          ENABLE_AUTHENTICATION=false
+          ENABLE_OFFLINE_MODE=true
+          ENV
+
+      - name: Build Android x86_64 release APK
+        working-directory: android
+        run: ./gradlew assembleProdRelease -PtargetAbi=x86_64 -PreactNativeArchitectures=x86_64 --no-daemon --stacktrace
+
+      - name: Inspect release APK and reject bundled model weights
+        shell: bash
+        run: |
+          set -euo pipefail
+          APK=android/app/build/outputs/apk/prod/release/app-prod-release.apk
+          test -s "$APK"
+          AAPT2=$(find "$ANDROID_HOME/build-tools" -type f -name aapt2 | sort | tail -1)
+          "$AAPT2" dump badging "$APK" | tee release-badging.txt
+          grep -q "package: name='com.pocketpallite'" release-badging.txt
+          grep -q "application-label:'MobiGPT'" release-badging.txt
+          test "$(unzip -Z1 "$APK" | awk -F/ '$1 == "lib" && NF >= 2 {print $2}' | sort -u)" = "x86_64"
+          if unzip -l "$APK" | grep -E '\.(onnx|pth|pt|index)( |$)'; then
+            echo 'RVC weights must not be bundled in the release APK.'
+            exit 1
+          fi
+          cp "$APK" rvc-gate-release.apk
+
+      - name: Upload release APK smoke artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: rvc-gate-release-x86_64
+          path: |
+            rvc-gate-release.apk
+            release-badging.txt
+          if-no-files-found: error
+          retention-days: 7
+
+  whole-app-smoke:
+    name: Whole-app Android release startup smoke
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    needs: android-release
+    steps:
+      - name: Download release APK
+        uses: actions/download-artifact@v4
+        with:
+          name: rvc-gate-release-x86_64
+          path: release
+
+      - name: Enable KVM permissions
+        run: |
+          test -e /dev/kvm
+          sudo chmod 666 /dev/kvm
+          test -r /dev/kvm && test -w /dev/kvm
+
+      - name: Install, launch, and inspect the whole app
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 34
+          target: google_apis
+          arch: x86_64
+          profile: pixel_2
+          cores: 2
+          ram-size: 2048M
+          heap-size: 512M
+          emulator-boot-timeout: 1200
+          force-avd-creation: true
+          emulator-options: -no-window -no-audio -no-boot-anim -no-snapshot -gpu swiftshader_indirect
+          disable-animations: true
+          script: |
+            set -eu; APK=release/rvc-gate-release.apk; test -s "$APK"; adb install -r "$APK"; adb shell am force-stop com.pocketpallite; adb shell monkey -p com.pocketpallite 1; sleep 30; pid="$(adb shell pidof com.pocketpallite | tr -d '\r' || true)"; test -n "$pid"; adb shell dumpsys activity activities | grep -q 'com.pocketpallite'; if adb logcat -d -b crash -v brief | grep -Eiq 'FATAL EXCEPTION|signal 11|SIGSEGV'; then adb logcat -d -b main -b system -b crash -v time >&2 || true; exit 1; fi; echo "MobiGPT whole-app startup smoke passed with pid $pid"; adb shell am force-stop com.pocketpallite

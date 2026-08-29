@@ -6,6 +6,7 @@ import {ttsStore} from '../../store';
 import {L10nContext} from '../../utils';
 
 import {VoicePickerView} from './VoicePickerView';
+import {RvcSetupCard} from '../rvc/RvcSetupCard';
 
 /**
  * Voice-led TTS sheet — single view.
@@ -26,6 +27,7 @@ export const TTSSetupSheet: React.FC = observer(() => {
       title={l10n.voiceAndSpeech.voicesTitle}
       snapPoints={['75%']}>
       <VoicePickerView />
+      <RvcSetupCard />
     </Sheet>
   );
 });

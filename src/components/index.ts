@@ -60,6 +60,7 @@ export * from './TextInput';
 export * from './TalentSurface';
 export * from './TextMessage';
 export * from './TTSSetupSheet';
+export * from './rvc/RvcSetupCard';
 export * from './DownloadOverlay';
 export * from './DownloadProgressCard';
 export * from './ToolErrorBlock';
