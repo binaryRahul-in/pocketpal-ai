@@ -108,6 +108,22 @@ jest.mock('react-native-safe-area-context', () => {
 
 jest.mock('../src/store', () => {
   const {UIStore} = require('../__mocks__/stores/uiStore');
+  const mockRvcStore = {
+    config: {
+      enabled: false,
+      mode: 'offline',
+      precision: 'fp32',
+      ttsPostProcessingEnabled: false,
+    },
+    selectedModel: null,
+    capability: {offlineRuntime: true, warnings: []},
+    jobState: 'idle',
+    jobError: null,
+    init: jest.fn(() => Promise.resolve()),
+    setConfig: jest.fn(),
+    pickAndInstallModel: jest.fn(() => Promise.resolve()),
+    selectModel: jest.fn(),
+  };
   return {
     modelStore: mockModelStore,
     UIStore,
@@ -119,6 +135,7 @@ jest.mock('../src/store', () => {
     deepLinkStore: mockDeepLinkStore,
     serverStore: mockServerStore,
     ttsStore: mockTTSStore,
+    rvcStore: mockRvcStore,
     checkoutFlowStore: mockCheckoutFlowStore,
     searchProviderStore: mockSearchProviderStore,
     defaultCompletionSettings: mockDefaultCompletionSettings,
